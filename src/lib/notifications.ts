@@ -27,6 +27,25 @@ export async function notifyStaffNewOrder(params: {
   });
 }
 
+/** Notifica al cliente que su asesor le creó una orden. */
+export async function notifyClientNewOrder(params: {
+  orderId: string;
+  number: number;
+  clientId: string;
+  product: string | null;
+}) {
+  const productLabel = labelOf(PRODUCTS, params.product);
+  await prisma.notification.create({
+    data: {
+      userId: params.clientId,
+      type: "ORDER_CREATED",
+      title: `Se creó tu orden ${formatOrderNumber(params.number)}`,
+      body: `Tu asesor registró una solicitud de ${productLabel}.`,
+      link: `/mis-ordenes/${params.orderId}`,
+    },
+  });
+}
+
 /** Notifica al cliente que su orden cambió de estado. */
 export async function notifyClientStatusChange(params: {
   orderId: string;

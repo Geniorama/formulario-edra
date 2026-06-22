@@ -8,6 +8,7 @@ import {
 } from "@/lib/validations";
 import { ADVISOR_FIELD_META } from "@/lib/product-fields";
 import { notifyClientStatusChange } from "@/lib/notifications";
+// (creación de órdenes por el asesor vive en ../route.ts)
 import { sendOrderStatusEmail } from "@/lib/mailer";
 import { ORDER_STATUS_LABELS, formatOrderNumber } from "@/lib/order-display";
 import type { OrderStatus } from "@/generated/prisma/enums";
@@ -87,6 +88,7 @@ export async function PATCH(request: Request, { params }: Params) {
     fields?: Record<string, unknown>;
     final?: Record<string, unknown>;
     takeOrder?: boolean;
+    assign?: boolean;
   };
   try {
     body = await request.json();
@@ -131,8 +133,9 @@ export async function PATCH(request: Request, { params }: Params) {
     data.paymentMethod = pm.success ? pm.data : null;
   }
 
-  // Gestor de venta: si la orden no tiene asesor (o pide tomarla), se asigna a quien diligencia.
-  if (!order.advisorId || body.takeOrder) {
+  // Gestor de venta: si la orden no tiene asesor (o pide tomarla), se asigna a
+  // quien diligencia. Con assign:false (cambio rápido de estado) no se reasigna.
+  if (body.assign !== false && (!order.advisorId || body.takeOrder)) {
     data.advisorId = session.user.id;
   }
 
