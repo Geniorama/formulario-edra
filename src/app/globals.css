@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+/* ───────────── Identidad de marca · Joyería Edra ───────────── */
+@theme {
+  --color-edra: #1496a6;
+  --color-edra-dark: #0f7e8c;
+  --color-edra-light: #4faab8;
+  --color-edra-soft: #e6f3f5;
+  --color-edra-grey: #6e6f71;
+  --color-edra-ink: #3c3936;
+  --color-edra-header: #eef4f4;
+  --color-edra-bg: #f3f7f7;
+
+  --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #3c3936;
+}
+
+body {
+  background: var(--color-edra-bg);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+/* Tailwind v4 quita el cursor pointer de los botones; lo restauramos. */
+button:not(:disabled),
+[role="button"]:not(:disabled),
+label[for] {
+  cursor: pointer;
+}
+
+/* Enfoque accesible y consistente con el teal de la marca. */
+input:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-edra);
+  outline-offset: 2px;
+}
+
+/* ── Input de teléfono internacional (react-phone-number-input) ── */
+.edra-phone .PhoneInput {
+  width: 100%;
+  gap: 0.5rem;
+}
+.edra-phone .PhoneInputCountry {
+  margin-right: 0.25rem;
+}
+.edra-phone .PhoneInputInput {
+  border: none;
+  background: transparent;
+  font-size: 0.875rem;
+  color: var(--color-edra-ink);
+}
+.edra-phone .PhoneInputInput::placeholder {
+  color: color-mix(in srgb, var(--color-edra-grey) 60%, transparent);
+}
+.edra-phone .PhoneInputInput:focus,
+.edra-phone .PhoneInputInput:focus-visible {
+  outline: none;
+}
+.edra-phone .PhoneInputCountrySelectArrow {
+  color: var(--color-edra-grey);
+  opacity: 0.7;
+}

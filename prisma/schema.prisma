@@ -1,0 +1,273 @@
+// Joyería Edra — esquema de autenticación
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  ASESOR
+  CLIENTE
+}
+
+model User {
+  id            String    @id @default(cuid())
+  firstName     String
+  lastName      String
+  email         String    @unique
+  phone         String?
+  passwordHash  String
+  role          Role      @default(CLIENTE)
+  active        Boolean   @default(true)
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tokens        Token[]
+  clientProfile ClientProfile?
+  orders        Order[]        @relation("ClientOrders")
+  advisedOrders Order[]        @relation("AdvisorOrders")
+  notifications Notification[]
+
+  @@map("users")
+}
+
+enum NotificationType {
+  ORDER_CREATED
+  ORDER_STATUS_CHANGED
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String // destinatario
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String?
+  link      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, read])
+  @@map("notifications")
+}
+
+// ───────────────── Flujo del cliente (registro por pasos) ─────────────────
+
+enum DocumentType {
+  CEDULA_CIUDADANIA
+  CEDULA_EXTRANJERIA
+  PASAPORTE
+}
+
+enum ContactMedium {
+  REFERENCIA
+  RED_SOCIAL
+  PAGINA_WEB
+  BUSCADOR_WEB
+}
+
+enum SocialNetwork {
+  FACEBOOK
+  X
+  INSTAGRAM
+  LINKEDIN
+}
+
+// Paso 2: Datos personales (a cargo del Cliente)
+model ClientProfile {
+  id String @id @default(cuid())
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Facturación / contacto (nullable: se guardan como borrador a medida que avanza)
+  documentType   DocumentType?
+  documentNumber String?
+  whatsapp       String?
+  contactMedium  ContactMedium?
+  socialNetwork  SocialNetwork? // condicional (si contactMedium = RED_SOCIAL)
+  socialLink     String?
+
+  // Envío
+  shippingCountry String?
+  cityState       String?
+  postalCode      String?
+  address         String?
+
+  privacyAccepted Boolean @default(false)
+
+  // Estado del registro por pasos
+  completed Boolean @default(false)
+  lastStep  Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("client_profiles")
+}
+
+enum Product {
+  ARGOLLAS
+  ANILLOS
+  SET_MATRIMONIAL
+  CINTILLO
+  CADENA
+  PULSERA
+  TOPOS
+  CANDONGAS
+  DIJE
+  PERSONALIZADO
+}
+
+enum Material {
+  ORO_10K
+  ORO_14K
+  ORO_18K
+  ORO_22K
+  ORO_24K
+  PLATA_925
+  PLATA_950
+}
+
+enum GemType {
+  DIAMANTE_NATURAL
+  DIAMANTE_LABORATORIO
+  ESMERALDA
+  ZAFIRO
+  RUBI
+  TANZANITA
+  TURMALINA
+  AGUAMARINA
+  AMATISTA
+  TOPACIO
+  CITRINO
+  PERIDOTO
+  GRANATE
+  MOISSANITA
+  ZIRCON_SUIZO_SINTETICO
+  OTRA
+  SIN_PIEDRA
+}
+
+enum OrderStatus {
+  PENDIENTE
+  EN_PROCESO
+  FINALIZADO
+  ENTREGADO
+  CANCELADO
+}
+
+enum DeliveryType {
+  ENVIO_INTERNACIONAL
+  ENVIO_NACIONAL
+  ENVIO_BOGOTA
+  RECOGER_EN_TIENDA
+}
+
+enum PaymentMethod {
+  TARJETA_CREDITO
+  TARJETA_DEBITO
+  ADDI
+  SISTECREDITO
+  TRANSFERENCIA
+  EFECTIVO
+}
+
+// Paso 3: Orden de trabajo
+model Order {
+  id     String @id @default(cuid())
+  // Número visible para el cliente (consecutivo).
+  number Int    @unique @default(autoincrement())
+
+  // Cliente dueño de la orden
+  userId String
+  user   User   @relation("ClientOrders", fields: [userId], references: [id], onDelete: Cascade)
+
+  // Asesor asignado (lo asigna el módulo de asesores)
+  advisorId String?
+  advisor   User?   @relation("AdvisorOrders", fields: [advisorId], references: [id], onDelete: SetNull)
+
+  // Código de orden de trabajo asignado por el Asesor (Paso 4)
+  workOrderCode String?
+
+  // Campos diligenciados por el Cliente (varían según el producto)
+  product            Product? // nullable: borrador
+  size               String? // talla (anillo)
+  sizeLady           String? // talla dama
+  sizeGentleman      String? // talla caballero
+  material           Material?
+  gemType            GemType?
+  engraving          String? // grabado (máx. 25)
+  engravingLady      String? // grabado argolla dama
+  engravingGentleman String? // grabado argolla caballero
+  fontType           String? // tipo de fuente
+
+  // Campos diligenciados por el Asesor (varían según el producto)
+  weightApprox       String? // peso aprox. (cadena)
+  weightLady         String? // peso aprox. dama (argollas)
+  weightGentleman    String? // peso aprox. caballero (argollas)
+  widthLady          String? // ancho aprox. dama (argollas/set)
+  widthGentleman     String? // ancho aprox. caballero (argollas/set)
+  model              String? // modelo
+  weaveType          String? // tipo de tejido (cadena)
+  length             String? // largo (cadena/pulsera)
+  productName        String? // nombre del producto (personalizado)
+  productDescription String? // tipo de producto (personalizado)
+  manufacturingNotes String? // observaciones de fabricación
+  gemNotes           String? // observación sobre las gemas
+
+  // Paso 4 — Datos finales (diligenciados por el Asesor). Valores en pesos (Int).
+  saleDate              DateTime? // fecha de venta
+  deliveryFrom          DateTime? // fecha de entrega/envío (desde)
+  deliveryTo            DateTime? // fecha de entrega/envío (hasta)
+  finalProductType      String? // tipo de producto
+  purchaseValue         Int? // valor compra
+  depositValue          Int? // valor abono
+  depositReceiptUrl     String? // comprobante de abono (enlace)
+  deliveryType          DeliveryType? // tipo de entrega
+  shippingValue         Int? // valor total del envío
+  balanceWithShipping   Int? // saldo con envío
+  finalDescription      String? // descripción del producto (solo asesor)
+  paymentMethod         PaymentMethod? // método de pago
+  jeweler               String? // joyero fabricante
+  jewelerDeliveryDate   DateTime? // fecha de entrega del joyero
+  systemEntry           String? // ingreso al sistema
+  estimatedDeliveryDate DateTime? // fecha estimada de entrega (hasta)
+  internalNotes         String? // notas adicionales (uso interno)
+
+  status OrderStatus @default(PENDIENTE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([advisorId])
+  @@map("orders")
+}
+
+enum TokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+  ACCOUNT_INVITE
+}
+
+model Token {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  type      TokenType
+  expires   DateTime
+  createdAt DateTime  @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("tokens")
+}
