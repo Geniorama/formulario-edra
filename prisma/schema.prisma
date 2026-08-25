@@ -176,6 +176,11 @@ enum DeliveryType {
   RECOGER_EN_TIENDA
 }
 
+// Medios de pago. La lista que se ofrece depende de `InvoiceType`:
+// Con FE → EFECTIVO..DATAFONO_EDUARDO; Sin FE → WESTERN_WEENDY..OTRO.
+// Las etiquetas y la separación viven en `src/lib/order-display.ts`.
+// TARJETA_CREDITO / TARJETA_DEBITO / TRANSFERENCIA ya no se ofrecen: se
+// conservan para no romper las órdenes antiguas que las usan.
 enum PaymentMethod {
   TARJETA_CREDITO
   TARJETA_DEBITO
@@ -183,6 +188,23 @@ enum PaymentMethod {
   SISTECREDITO
   TRANSFERENCIA
   EFECTIVO
+  BANCOLOMBIA_EDUARDO
+  DAVIVIENDA_EDUARDO
+  DATAFONO_EDUARDO
+  WESTERN_WEENDY
+  BANCOLOMBIA_WEENDY
+  DATAFONO_ROJO
+  NEQUI_SANTIAGO
+  NEQUI_DON_MAURO
+  ESTABAN_CLAUDIA_JM
+  HECTOR_NARANJO
+  DAVIVIENDA_ERIKA
+  SUSA
+  LUZ
+  JIMMY
+  FREDDY
+  DON_FREDDY
+  OTRO
 }
 
 // Facturación electrónica: con FE o sin FE.
@@ -267,7 +289,8 @@ model Order {
   deliveryType        DeliveryType? // tipo de entrega
   shippingValue       Int? // valor envío
   balanceWithShipping Int? // saldo con envío = compra - abono + envío (calculado)
-  paymentMethod       PaymentMethod? // método de pago
+  paymentMethod       PaymentMethod? // método de pago (según invoiceType)
+  paymentMethodOther  String? // medio de pago escrito por el asesor (si es OTRO)
   invoiceType         InvoiceType? // con FE / sin FE
   jeweler             String? // joyero fabricante
   systemEntry         String? // ingreso al sistema

@@ -17,6 +17,8 @@ import {
   ORDER_STATUS_LABELS,
   formatOrderNumber,
   computeBalanceWithShipping,
+  isPaymentMethodAllowed,
+  PAYMENT_METHOD_OTHER,
 } from "@/lib/order-display";
 import type { OrderStatus } from "@/generated/prisma/enums";
 import type { Prisma } from "@/generated/prisma/client";
@@ -147,10 +149,19 @@ export async function PATCH(request: Request, { params }: Params) {
 
     const dt = deliveryTypeEnum.safeParse(final.deliveryType);
     data.deliveryType = dt.success ? dt.data : null;
-    const pm = paymentMethodEnum.safeParse(final.paymentMethod);
-    data.paymentMethod = pm.success ? pm.data : null;
     const fe = invoiceTypeEnum.safeParse(final.invoiceType);
     data.invoiceType = fe.success ? fe.data : null;
+
+    // El medio de pago debe pertenecer a la lista de la facturación elegida;
+    // el texto libre solo se guarda cuando el medio de pago es "Otro".
+    const pm = paymentMethodEnum.safeParse(final.paymentMethod);
+    const method =
+      pm.success && isPaymentMethodAllowed(data.invoiceType as string | null, pm.data)
+        ? pm.data
+        : null;
+    data.paymentMethod = method;
+    data.paymentMethodOther =
+      method === PAYMENT_METHOD_OTHER ? trimOrNull(final.paymentMethodOther) : null;
 
     // Saldo con envío: siempre calculado en el servidor (no editable).
     data.balanceWithShipping = computeBalanceWithShipping({

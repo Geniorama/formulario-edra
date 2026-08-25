@@ -21,6 +21,9 @@ Proyecto **Joyería Edra**: autenticación con Next.js 16 (App Router) + TypeScr
   mueve allí los datos por producto de cada orden, agrega barrio/especificaciones
   de la dirección y actualiza la lista de materiales). **Correr ANTES de `db:push`**;
   va después de `db:migrate-ajustes`.
+- `npm run db:migrate-medios-pago` (migración idempotente: agrega los nuevos valores
+  del enum `PaymentMethod` y la columna `paymentMethodOther`). **Correr ANTES de
+  `db:push`**; va después de `db:migrate-multiproducto`.
 - `npm run test:correo -- correo@dominio.com [--real]` (prueba ZeptoMail; con
   `--real` genera un token verdadero y envía el enlace de restablecimiento).
 
@@ -63,7 +66,8 @@ Proyecto **Joyería Edra**: autenticación con Next.js 16 (App Router) + TypeScr
 - **ADMIN = edición completa**: además edita la solicitud del cliente de cada producto (producto, tallas, material, gemas, grabados), **agrega o quita productos de la compra** y reasigna el asesor. El form recibe `canEditClient` y `advisors`; la API acepta `items[].client`, altas/bajas de productos y `advisorId` solo si el rol es ADMIN.
 - Estructura del formulario (`advisor-order-form.tsx`):
   - **Paso 1 – Orden de trabajo**: código, estado, (admin: asesor) y un bloque por producto con la solicitud del cliente (editable solo para admin), sus detalles técnicos y su **Descripción del producto** (`finalDescription`).
-  - **Paso 2 – Datos finales**: fecha de venta → fecha de entrega del joyero → fecha de entrega y envío (desde/hasta); valor compra, abono, envío y **saldo con envío calculado y no editable** (`computeBalanceWithShipping` = compra − abono + envío, recalculado también en el servidor); comprobante de abono (**archivo**); tipo de entrega, método de pago y **Facturación electrónica (Con FE / Sin FE)**; joyero; notas internas y, al final, **Observaciones de fabricación** (`manufacturingNotes`, ya no va por producto).
+  - **Paso 2 – Datos finales**: fecha de venta → fecha de entrega del joyero → fecha de entrega y envío (desde/hasta); valor compra, abono, envío y **saldo con envío calculado y no editable** (`computeBalanceWithShipping` = compra − abono + envío, recalculado también en el servidor); comprobante de abono (**archivo**); tipo de entrega, **Facturación electrónica (Con FE / Sin FE)** y **medio de pago dependiente de ella**; joyero; notas internas y, al final, **Observaciones de fabricación** (`manufacturingNotes`, ya no va por producto).
+- **Medios de pago**: la lista del selector depende de `invoiceType`. Con FE → `PAYMENT_METHODS_FE` (Efectivo, Addi, Bancolombia/Davivienda/Datafono Eduardo); Sin FE → `PAYMENT_METHODS_SIN_FE` (Western Weendy … Otro). Helpers en `order-display.ts`: `paymentMethodOptionsFor(invoiceType)` e `isPaymentMethodAllowed`. Al cambiar la facturación se limpia el medio de pago que ya no aplique (en el cliente y revalidado en la API). Si es `OTRO`, el asesor escribe cuál en `Order.paymentMethodOther`. Los valores viejos (`TARJETA_CREDITO`, `TARJETA_DEBITO`, `TRANSFERENCIA`) siguen en el enum solo para mostrar órdenes antiguas.
 - API: `PATCH /api/asesor/ordenes/[id]` (rol ASESOR/ADMIN; whitelista campos; el cuerpo lleva `items: [{ id, fields, client? }]`) y `POST/GET/DELETE /api/asesor/ordenes/[id]/comprobante` (archivo del comprobante: máx. 5 MB, PDF o imagen, guardado en la BD en `depositReceiptData`; el GET lo puede ver el staff y el cliente dueño).
 - Estados (`OrderStatus`, en orden): `EN_TRAMITE`, `EN_FABRICACION`, `ENGASTE`, `NOVEDAD_FABRICACION`, `FINALIZADO`, `ENTREGADO`, `DESISTIDO`.
 

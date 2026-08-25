@@ -153,7 +153,7 @@ export function AdminUsersTable({
                           onClick={() => resendInvite(u.id)}
                           className="rounded-full border border-edra px-3 py-1 text-xs font-medium text-edra hover:bg-edra hover:text-white disabled:opacity-50"
                         >
-                          Reenviar
+                          Reenviar accesos
                         </button>
                       ) : null}
                       {!isSelf ? (

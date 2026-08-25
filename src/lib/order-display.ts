@@ -32,15 +32,76 @@ export const DELIVERY_TYPE_OPTIONS: { value: DeliveryType; label: string }[] = [
   { value: "RECOGER_EN_TIENDA", label: "Recoger en tienda" },
 ];
 
-export const PAYMENT_METHOD_OPTIONS: { value: PaymentMethod; label: string }[] =
-  [
-    { value: "TARJETA_CREDITO", label: "Tarjeta crédito" },
-    { value: "TARJETA_DEBITO", label: "Tarjeta débito" },
-    { value: "ADDI", label: "Addi" },
-    { value: "SISTECREDITO", label: "Sistecredito" },
-    { value: "TRANSFERENCIA", label: "Transferencia" },
-    { value: "EFECTIVO", label: "Efectivo" },
-  ];
+type PaymentOption = { value: PaymentMethod; label: string };
+
+/** Medios de pago cuando la compra se factura electrónicamente (Con FE). */
+export const PAYMENT_METHODS_FE: PaymentOption[] = [
+  { value: "EFECTIVO", label: "Efectivo" },
+  { value: "ADDI", label: "Addi" },
+  { value: "BANCOLOMBIA_EDUARDO", label: "Bancolombia Eduardo" },
+  { value: "DAVIVIENDA_EDUARDO", label: "Davivienda Eduardo" },
+  { value: "DATAFONO_EDUARDO", label: "Datafono Eduardo" },
+];
+
+/** Medios de pago cuando la compra no se factura electrónicamente (Sin FE). */
+export const PAYMENT_METHODS_SIN_FE: PaymentOption[] = [
+  { value: "WESTERN_WEENDY", label: "Western Weendy" },
+  { value: "BANCOLOMBIA_WEENDY", label: "Bancolombia Weendy" },
+  { value: "DATAFONO_ROJO", label: "Datafono Rojo" },
+  { value: "SISTECREDITO", label: "Sistecredito" },
+  { value: "NEQUI_SANTIAGO", label: "Nequi Santiago" },
+  { value: "NEQUI_DON_MAURO", label: "Nequi Don Mauro" },
+  { value: "ESTABAN_CLAUDIA_JM", label: "Estaban/Claudia JM" },
+  { value: "HECTOR_NARANJO", label: "Hector Naranjo" },
+  { value: "DAVIVIENDA_ERIKA", label: "Davivienda Erika" },
+  { value: "SUSA", label: "Susa" },
+  { value: "LUZ", label: "Luz" },
+  { value: "JIMMY", label: "Jimmy" },
+  { value: "FREDDY", label: "Freddy" },
+  { value: "DON_FREDDY", label: "Don Freddy" },
+  { value: "OTRO", label: "Otro" },
+];
+
+/**
+ * Medios de pago que ya no se ofrecen: se conservan solo para que las órdenes
+ * antiguas sigan mostrando su etiqueta.
+ */
+const LEGACY_PAYMENT_METHODS: PaymentOption[] = [
+  { value: "TARJETA_CREDITO", label: "Tarjeta crédito" },
+  { value: "TARJETA_DEBITO", label: "Tarjeta débito" },
+  { value: "TRANSFERENCIA", label: "Transferencia" },
+];
+
+/** Todas las etiquetas conocidas (para mostrar, no para los selectores). */
+export const PAYMENT_METHOD_OPTIONS: PaymentOption[] = [
+  ...PAYMENT_METHODS_FE,
+  ...PAYMENT_METHODS_SIN_FE,
+  ...LEGACY_PAYMENT_METHODS,
+];
+
+/** Valor libre que el asesor escribe cuando el medio de pago es "Otro". */
+export const PAYMENT_METHOD_OTHER: PaymentMethod = "OTRO";
+
+/**
+ * Opciones del selector de medio de pago según la facturación elegida.
+ * Sin facturación seleccionada no hay lista: primero se elige Con FE / Sin FE.
+ */
+export function paymentMethodOptionsFor(
+  invoiceType?: InvoiceType | string | null
+): PaymentOption[] {
+  if (invoiceType === "CON_FE") return PAYMENT_METHODS_FE;
+  if (invoiceType === "SIN_FE") return PAYMENT_METHODS_SIN_FE;
+  return [];
+}
+
+/** ¿El medio de pago corresponde a la facturación elegida? */
+export function isPaymentMethodAllowed(
+  invoiceType: InvoiceType | string | null | undefined,
+  method: PaymentMethod | string | null | undefined
+): boolean {
+  if (!method) return true;
+  return paymentMethodOptionsFor(invoiceType).some((o) => o.value === method);
+}
 
 export const INVOICE_TYPE_OPTIONS: { value: InvoiceType; label: string }[] = [
   { value: "CON_FE", label: "Con FE" },
@@ -55,7 +116,12 @@ export function deliveryTypeLabel(v?: DeliveryType | null): string {
   return DELIVERY_TYPE_OPTIONS.find((o) => o.value === v)?.label ?? "—";
 }
 
-export function paymentMethodLabel(v?: PaymentMethod | null): string {
+/** Etiqueta del medio de pago; "Otro" muestra lo que escribió el asesor. */
+export function paymentMethodLabel(
+  v?: PaymentMethod | null,
+  other?: string | null
+): string {
+  if (v === PAYMENT_METHOD_OTHER && other?.trim()) return other.trim();
   return PAYMENT_METHOD_OPTIONS.find((o) => o.value === v)?.label ?? "—";
 }
 

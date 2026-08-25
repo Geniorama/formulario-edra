@@ -32,8 +32,10 @@ import { MAX_ORDER_ITEMS } from "@/lib/validations";
 import {
   ORDER_STATUS_OPTIONS,
   DELIVERY_TYPE_OPTIONS,
-  PAYMENT_METHOD_OPTIONS,
   INVOICE_TYPE_OPTIONS,
+  PAYMENT_METHOD_OTHER,
+  paymentMethodOptionsFor,
+  isPaymentMethodAllowed,
   computeBalanceWithShipping,
 } from "@/lib/order-display";
 import type { OrderStatus } from "@/generated/prisma/enums";
@@ -104,6 +106,16 @@ export function AdvisorOrderForm({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Medios de pago: la lista depende de la facturación electrónica elegida.
+  const paymentOptions = paymentMethodOptionsFor(final.invoiceType);
+  const showPaymentOther = final.paymentMethod === PAYMENT_METHOD_OTHER;
+  const paymentLabel =
+    final.invoiceType === "CON_FE"
+      ? "Medio de pago FE"
+      : final.invoiceType === "SIN_FE"
+        ? "Método de pago sin FE"
+        : "Medio de pago";
+
   // Saldo con envío: calculado, no editable.
   const balance = computeBalanceWithShipping({
     purchaseValue: final.purchaseValue,
@@ -153,6 +165,33 @@ export function AdvisorOrderForm({
   }
   function setFin(key: string, value: string) {
     setFinal((prev) => ({ ...prev, [key]: value }));
+  }
+
+  // El medio de pago depende de la facturación (Con FE / Sin FE): al cambiarla
+  // se descarta el que ya no aplique. El texto libre solo vive con "Otro".
+  function setInvoiceType(value: string) {
+    setFinal((prev) => {
+      const paymentMethod = isPaymentMethodAllowed(value, prev.paymentMethod)
+        ? prev.paymentMethod ?? ""
+        : "";
+      return {
+        ...prev,
+        invoiceType: value,
+        paymentMethod,
+        paymentMethodOther:
+          paymentMethod === PAYMENT_METHOD_OTHER
+            ? prev.paymentMethodOther ?? ""
+            : "",
+      };
+    });
+  }
+  function setPaymentMethod(value: string) {
+    setFinal((prev) => ({
+      ...prev,
+      paymentMethod: value,
+      paymentMethodOther:
+        value === PAYMENT_METHOD_OTHER ? prev.paymentMethodOther ?? "" : "",
+    }));
   }
 
   // Persiste todo el estado en la BD. Devuelve true si guardó bien.
@@ -407,22 +446,9 @@ export function AdvisorOrderForm({
               ))}
             </SelectField>
             <SelectField
-              label="Método de pago"
-              value={final.paymentMethod ?? ""}
-              onChange={(e) => setFin("paymentMethod", e.target.value)}
-              optional
-            >
-              <option value="">Selecciona...</option>
-              {PAYMENT_METHOD_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </SelectField>
-            <SelectField
               label="Facturación electrónica"
               value={final.invoiceType ?? ""}
-              onChange={(e) => setFin("invoiceType", e.target.value)}
+              onChange={(e) => setInvoiceType(e.target.value)}
               optional
             >
               <option value="">Selecciona...</option>
@@ -432,6 +458,34 @@ export function AdvisorOrderForm({
                 </option>
               ))}
             </SelectField>
+            <SelectField
+              label={paymentLabel}
+              value={final.paymentMethod ?? ""}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              disabled={paymentOptions.length === 0}
+              optional
+            >
+              <option value="">
+                {paymentOptions.length === 0
+                  ? "Elige primero la facturación..."
+                  : "Selecciona..."}
+              </option>
+              {paymentOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </SelectField>
+            {showPaymentOther ? (
+              <Field
+                label="¿Cuál medio de pago?"
+                value={final.paymentMethodOther ?? ""}
+                onChange={(e) => setFin("paymentMethodOther", e.target.value)}
+                placeholder="Escribe el medio de pago"
+                maxLength={80}
+                optional
+              />
+            ) : null}
             <Field
               label="Joyero fabricante"
               value={final.jeweler ?? ""}

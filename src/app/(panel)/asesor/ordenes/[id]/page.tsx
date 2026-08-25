@@ -86,6 +86,7 @@ export default async function AsesorOrdenDetallePage({
     shippingValue: order.shippingValue?.toString() ?? "",
     deliveryType: order.deliveryType ?? "",
     paymentMethod: order.paymentMethod ?? "",
+    paymentMethodOther: order.paymentMethodOther ?? "",
     invoiceType: order.invoiceType ?? "",
     jeweler: order.jeweler ?? "",
     internalNotes: order.internalNotes ?? "",

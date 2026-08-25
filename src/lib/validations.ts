@@ -129,13 +129,34 @@ export const deliveryTypeEnum = z.enum([
   "RECOGER_EN_TIENDA",
 ]);
 
+// Medios de pago. Los tres primeros son heredados (ya no se ofrecen en la UI,
+// pero siguen siendo válidos para las órdenes antiguas).
 export const paymentMethodEnum = z.enum([
   "TARJETA_CREDITO",
   "TARJETA_DEBITO",
-  "ADDI",
-  "SISTECREDITO",
   "TRANSFERENCIA",
+  // Con FE
   "EFECTIVO",
+  "ADDI",
+  "BANCOLOMBIA_EDUARDO",
+  "DAVIVIENDA_EDUARDO",
+  "DATAFONO_EDUARDO",
+  // Sin FE
+  "WESTERN_WEENDY",
+  "BANCOLOMBIA_WEENDY",
+  "DATAFONO_ROJO",
+  "SISTECREDITO",
+  "NEQUI_SANTIAGO",
+  "NEQUI_DON_MAURO",
+  "ESTABAN_CLAUDIA_JM",
+  "HECTOR_NARANJO",
+  "DAVIVIENDA_ERIKA",
+  "SUSA",
+  "LUZ",
+  "JIMMY",
+  "FREDDY",
+  "DON_FREDDY",
+  "OTRO",
 ]);
 
 export const invoiceTypeEnum = z.enum(["CON_FE", "SIN_FE"]);
