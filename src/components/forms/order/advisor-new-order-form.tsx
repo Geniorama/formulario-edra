@@ -3,47 +3,27 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { OrderFields } from "./order-fields";
+import { OrderItemsEditor } from "./order-fields";
+import { useOrderItems } from "./use-order-items";
 import { SelectField, SubmitButton, FormAlert } from "@/components/ui/form-fields";
-import {
-  emptyOrder,
-  validateOrderState,
-  type OrderState,
-} from "@/lib/order-utils";
-import type { OrderFieldKey } from "@/lib/product-fields";
 
 export type ClientOption = { id: string; name: string; email: string };
 
 export function AdvisorNewOrderForm({ clients }: { clients: ClientOption[] }) {
   const router = useRouter();
   const [clientId, setClientId] = useState("");
-  const [order, setOrder] = useState<OrderState>(emptyOrder);
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [clientTouched, setClientTouched] = useState(false);
+  const { items, errors, valid, handlers, revealErrors } = useOrderItems();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function onField(key: OrderFieldKey, value: string) {
-    setOrder((p) => ({ ...p, [key]: value }));
-    setTouched((p) => ({ ...p, [key]: true }));
-  }
-  function onProduct(value: string) {
-    setOrder({ ...emptyOrder, product: value });
-    setTouched((p) => ({ ...p, product: true }));
-  }
-
-  const allErrors = validateOrderState(order);
-  const errors: Record<string, string> = {};
-  for (const k in allErrors) if (touched[k]) errors[k] = allErrors[k];
-  const clientError = touched.clientId && !clientId ? "Selecciona un cliente" : undefined;
+  const clientError =
+    clientTouched && !clientId ? "Selecciona un cliente" : undefined;
 
   async function submit() {
-    const e = validateOrderState(order);
-    setTouched((prev) => {
-      const t: Record<string, boolean> = { ...prev, clientId: true };
-      for (const k in e) t[k] = true;
-      return t;
-    });
-    if (!clientId || Object.keys(e).length > 0) return;
+    setClientTouched(true);
+    if (!valid) revealErrors();
+    if (!clientId || !valid) return;
 
     setLoading(true);
     setError(null);
@@ -51,7 +31,7 @@ export function AdvisorNewOrderForm({ clients }: { clients: ClientOption[] }) {
       const res = await fetch("/api/asesor/ordenes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clientId, order }),
+        body: JSON.stringify({ clientId, order: { items } }),
       });
       const body = await res.json();
       setLoading(false);
@@ -81,7 +61,7 @@ export function AdvisorNewOrderForm({ clients }: { clients: ClientOption[] }) {
           value={clientId}
           onChange={(e) => {
             setClientId(e.target.value);
-            setTouched((p) => ({ ...p, clientId: true }));
+            setClientTouched(true);
           }}
           error={clientError}
         >
@@ -94,12 +74,7 @@ export function AdvisorNewOrderForm({ clients }: { clients: ClientOption[] }) {
         </SelectField>
       </div>
 
-      <OrderFields
-        order={order}
-        onField={onField}
-        onProduct={onProduct}
-        errors={errors}
-      />
+      <OrderItemsEditor items={items} errors={errors} {...handlers} />
 
       <div className="mt-8 flex items-center justify-between gap-3">
         <Link

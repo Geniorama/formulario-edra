@@ -10,7 +10,7 @@ import {
   advisorFieldsForProduct,
   ADVISOR_FIELD_META,
 } from "@/lib/product-fields";
-import { orderFieldDisplay } from "@/lib/order-utils";
+import { orderFieldDisplay, type OrderItemState } from "@/lib/order-utils";
 import {
   ORDER_STATUS_LABELS,
   ORDER_STATUS_STYLES,
@@ -18,7 +18,11 @@ import {
   formatMoney,
   formatDate,
   deliveryTypeLabel,
+  invoiceTypeLabel,
+  orderProductsLabel,
 } from "@/lib/order-display";
+
+const s = (v?: string | null) => v ?? "";
 
 export default async function OrdenDetallePage({
   params,
@@ -32,7 +36,10 @@ export default async function OrdenDetallePage({
   const { id } = await params;
   const order = await prisma.order.findFirst({
     where: { id, userId: session.user.id },
+    // El archivo del comprobante se descarga aparte (no se trae en la página).
+    omit: { depositReceiptData: true },
     include: {
+      items: { orderBy: { position: "asc" } },
       advisor: {
         select: { firstName: true, lastName: true, email: true, phone: true },
       },
@@ -40,23 +47,25 @@ export default async function OrdenDetallePage({
   });
   if (!order) notFound();
 
-  const view = {
-    product: order.product ?? "",
-    size: order.size ?? "",
-    sizeLady: order.sizeLady ?? "",
-    sizeGentleman: order.sizeGentleman ?? "",
-    material: order.material ?? "",
-    gemType: order.gemType ?? "",
-    engraving: order.engraving ?? "",
-    engravingLady: order.engravingLady ?? "",
-    engravingGentleman: order.engravingGentleman ?? "",
-    fontType: order.fontType ?? "",
-  };
+  const items = order.items.map((item) => ({
+    id: item.id,
+    view: {
+      product: s(item.product),
+      size: s(item.size),
+      sizeLady: s(item.sizeLady),
+      sizeGentleman: s(item.sizeGentleman),
+      material: s(item.material),
+      gemType: s(item.gemType),
+      gemOther: s(item.gemOther),
+      engraving: s(item.engraving),
+      engravingLady: s(item.engravingLady),
+      engravingGentleman: s(item.engravingGentleman),
+      fontType: s(item.fontType),
+    } satisfies OrderItemState,
+    advisor: item,
+  }));
 
-  const advisorKeys = advisorFieldsForProduct(view.product);
-  const advisorPending = advisorKeys.every(
-    (k) => !order[k as keyof typeof order]
-  );
+  const multiple = items.length > 1;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -74,7 +83,7 @@ export default async function OrdenDetallePage({
               {formatOrderNumber(order.number)}
             </span>
             <h1 className="text-2xl font-semibold text-edra-ink">
-              {labelOf(PRODUCTS, order.product)}
+              {orderProductsLabel(order.items, true)}
             </h1>
           </div>
           <span
@@ -98,22 +107,27 @@ export default async function OrdenDetallePage({
         </p>
       </div>
 
-      {/* Datos del cliente */}
-      <div className="rounded-3xl bg-white p-6 shadow-[0_10px_40px_rgba(20,150,166,0.10)] sm:p-8">
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-edra-grey">
-          Tu solicitud
-        </h2>
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
-          <Row label="Producto" value={labelOf(PRODUCTS, order.product)} />
-          {fieldsForProduct(view.product).map((key) => (
-            <Row
-              key={key}
-              label={ORDER_FIELD_META[key].label}
-              value={orderFieldDisplay(view, key)}
-            />
-          ))}
-        </dl>
-      </div>
+      {/* Solicitud del cliente: un bloque por producto de la compra */}
+      {items.map(({ id: itemId, view }, index) => (
+        <div
+          key={itemId}
+          className="rounded-3xl bg-white p-6 shadow-[0_10px_40px_rgba(20,150,166,0.10)] sm:p-8"
+        >
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-edra-grey">
+            {multiple ? `Producto ${index + 1}` : "Tu solicitud"}
+          </h2>
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+            <Row label="Producto" value={labelOf(PRODUCTS, view.product)} />
+            {fieldsForProduct(view.product).map((key) => (
+              <Row
+                key={key}
+                label={ORDER_FIELD_META[key].label}
+                value={orderFieldDisplay(view, key)}
+              />
+            ))}
+          </dl>
+        </div>
+      ))}
 
       {/* Datos de contacto del asesor */}
       <div className="rounded-3xl bg-white p-6 shadow-[0_10px_40px_rgba(20,150,166,0.10)] sm:p-8">
@@ -177,33 +191,68 @@ export default async function OrdenDetallePage({
             value={formatMoney(order.balanceWithShipping)}
             muted={order.balanceWithShipping == null}
           />
+          <Row
+            label="Facturación"
+            value={order.invoiceType ? invoiceTypeLabel(order.invoiceType) : "Pendiente"}
+            muted={!order.invoiceType}
+          />
         </dl>
+
+        {order.depositReceiptName ? (
+          <a
+            href={`/api/asesor/ordenes/${order.id}/comprobante`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-edra hover:text-edra-dark"
+          >
+            Ver comprobante de abono
+          </a>
+        ) : null}
       </div>
 
-      {/* Datos técnicos del asesor (solo lectura) */}
+      {/* Datos técnicos del asesor (solo lectura), por producto */}
       <div className="rounded-3xl bg-white p-6 shadow-[0_10px_40px_rgba(20,150,166,0.10)] sm:p-8">
-        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-edra-grey">
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-edra-grey">
           Información del asesor
         </h2>
-        {advisorPending ? (
-          <p className="mb-4 text-sm text-edra-grey">
-            Tu asesor aún no ha diligenciado estos campos. Aquí verás los
-            detalles técnicos cuando estén listos.
-          </p>
-        ) : null}
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
-          {advisorKeys.map((k) => {
-            const value = order[k as keyof typeof order];
+        <div className="space-y-5">
+          {items.map(({ id: itemId, view, advisor }, index) => {
+            const advisorKeys = advisorFieldsForProduct(view.product);
+            const pending = advisorKeys.every(
+              (k) => !advisor[k as keyof typeof advisor]
+            );
             return (
-              <Row
-                key={k}
-                label={ADVISOR_FIELD_META[k].label}
-                value={typeof value === "string" && value ? value : "Pendiente"}
-                muted={!value}
-              />
+              <div key={itemId}>
+                {multiple ? (
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-edra-grey/80">
+                    Producto {index + 1} · {labelOf(PRODUCTS, view.product)}
+                  </p>
+                ) : null}
+                {pending ? (
+                  <p className="mb-3 text-sm text-edra-grey">
+                    Tu asesor aún no ha diligenciado estos campos. Aquí verás
+                    los detalles técnicos cuando estén listos.
+                  </p>
+                ) : null}
+                <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+                  {advisorKeys.map((k) => {
+                    const value = advisor[k as keyof typeof advisor];
+                    return (
+                      <Row
+                        key={k}
+                        label={ADVISOR_FIELD_META[k].label}
+                        value={
+                          typeof value === "string" && value ? value : "Pendiente"
+                        }
+                        muted={!value}
+                      />
+                    );
+                  })}
+                </dl>
+              </div>
             );
           })}
-        </dl>
+        </div>
       </div>
     </div>
   );

@@ -12,6 +12,9 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
+    "db:migrate-ajustes": "tsx prisma/migrate-ajustes.ts",
+    "db:migrate-multiproducto": "tsx prisma/migrate-multiproducto.ts",
+    "test:correo": "tsx scripts/test-correo.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {

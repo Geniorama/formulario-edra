@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { postalCodeRequired } from "@/lib/form-options";
 
 export const registerSchema = z
   .object({
@@ -106,17 +107,19 @@ export const materialEnum = z.enum([
   "ORO_10K",
   "ORO_14K",
   "ORO_18K",
-  "ORO_22K",
-  "ORO_24K",
+  "ORO_18K_PLATA",
   "PLATA_925",
   "PLATA_950",
+  "PLATINO_950",
 ]);
 export const orderStatusEnum = z.enum([
-  "PENDIENTE",
-  "EN_PROCESO",
+  "EN_TRAMITE",
+  "EN_FABRICACION",
+  "ENGASTE",
+  "NOVEDAD_FABRICACION",
   "FINALIZADO",
   "ENTREGADO",
-  "CANCELADO",
+  "DESISTIDO",
 ]);
 
 export const deliveryTypeEnum = z.enum([
@@ -134,6 +137,8 @@ export const paymentMethodEnum = z.enum([
   "TRANSFERENCIA",
   "EFECTIVO",
 ]);
+
+export const invoiceTypeEnum = z.enum(["CON_FE", "SIN_FE"]);
 
 export const gemEnum = z.enum([
   "DIAMANTE_NATURAL",
@@ -174,10 +179,20 @@ const personalBase = z.object({
   cityState: z.string().trim().min(1, "Ingresa la ciudad o estado"),
   postalCode: z.string().trim().max(20).optional().or(z.literal("")),
   address: z.string().trim().min(3, "Ingresa la dirección de envío"),
+  neighborhood: z.string().trim().max(80).optional().or(z.literal("")),
+  addressDetails: z.string().trim().max(200).optional().or(z.literal("")),
   privacyAccepted: z.boolean(),
 });
 
 export const personalDataSchema = personalBase.superRefine((data, ctx) => {
+  // El código postal solo es obligatorio para envíos fuera de Colombia.
+  if (postalCodeRequired(data.shippingCountry) && !data.postalCode) {
+    ctx.addIssue({
+      path: ["postalCode"],
+      code: "custom",
+      message: "El código postal es obligatorio para envíos internacionales",
+    });
+  }
   if (data.contactMedium === "RED_SOCIAL") {
     if (!data.socialNetwork) {
       ctx.addIssue({
@@ -210,17 +225,41 @@ const engravingField = z
   .optional()
   .or(z.literal(""));
 
+// Un producto dentro de la compra.
+export const orderItemSchema = z
+  .object({
+    product: productEnum,
+    size: z.string().optional().or(z.literal("")),
+    sizeLady: z.string().optional().or(z.literal("")),
+    sizeGentleman: z.string().optional().or(z.literal("")),
+    material: materialEnum,
+    gemType: gemEnum.optional().or(z.literal("")),
+    gemOther: z.string().trim().max(80).optional().or(z.literal("")),
+    engraving: engravingField,
+    engravingLady: engravingField,
+    engravingGentleman: engravingField,
+    fontType: z.string().optional().or(z.literal("")),
+  })
+  .superRefine((data, ctx) => {
+    // Si eligió "Otra" gema, debe escribir cuál.
+    if (data.gemType === "OTRA" && !data.gemOther) {
+      ctx.addIssue({
+        path: ["gemOther"],
+        code: "custom",
+        message: "Indica qué tipo de gema deseas",
+      });
+    }
+  });
+
+// Máximo de productos por compra (evita envíos abusivos).
+export const MAX_ORDER_ITEMS = 15;
+
+// Una compra puede incluir varios productos.
 export const workOrderSchema = z.object({
-  product: productEnum,
-  size: z.string().optional().or(z.literal("")),
-  sizeLady: z.string().optional().or(z.literal("")),
-  sizeGentleman: z.string().optional().or(z.literal("")),
-  material: materialEnum,
-  gemType: gemEnum.optional().or(z.literal("")),
-  engraving: engravingField,
-  engravingLady: engravingField,
-  engravingGentleman: engravingField,
-  fontType: z.string().optional().or(z.literal("")),
+  items: z
+    .array(orderItemSchema)
+    .min(1, "Agrega al menos un producto")
+    .max(MAX_ORDER_ITEMS, `Máximo ${MAX_ORDER_ITEMS} productos por compra`),
 });
 
 export const clientOnboardingSchema = z.object({
@@ -229,6 +268,7 @@ export const clientOnboardingSchema = z.object({
 });
 
 export type PersonalDataInput = z.infer<typeof personalBase>;
+export type OrderItemInput = z.infer<typeof orderItemSchema>;
 export type WorkOrderInput = z.infer<typeof workOrderSchema>;
 
 export const loginSchema = z.object({

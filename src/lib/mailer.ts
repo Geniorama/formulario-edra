@@ -133,23 +133,24 @@ export async function sendInviteEmail(
   });
 }
 
+/** Aviso de cambio de estado dirigido al asesor de la orden (no al cliente). */
 export async function sendOrderStatusEmail(
   to: string,
   orderNumber: string,
   statusLabel: string,
   orderId: string
 ) {
-  const url = `${appUrl()}/mis-ordenes/${orderId}`;
+  const url = `${appUrl()}/asesor/ordenes/${orderId}`;
   await sendEmail({
     to,
-    subject: `Tu orden ${orderNumber} · ${statusLabel}`,
+    subject: `Orden ${orderNumber} · ${statusLabel}`,
     html: baseTemplate({
-      title: "Actualización de tu orden",
-      intro: `El estado de tu orden <strong>${orderNumber}</strong> cambió a <strong>${statusLabel}</strong>. Ingresa para ver los detalles.`,
-      buttonLabel: "Ver mi orden",
+      title: "Actualización de una orden",
+      intro: `El estado de la orden <strong>${orderNumber}</strong> cambió a <strong>${statusLabel}</strong>. Ingresa para ver los detalles.`,
+      buttonLabel: "Ver la orden",
       buttonUrl: url,
       footerNote:
-        "Recibes este correo porque tienes una orden activa en Joyería Edra.",
+        "Recibes este correo porque gestionas órdenes en Joyería Edra.",
     }),
   });
 }

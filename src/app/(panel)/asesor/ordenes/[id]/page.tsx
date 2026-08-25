@@ -4,25 +4,26 @@ import { ArrowLeft } from "lucide-react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import {
-  PRODUCTS,
   DOCUMENT_TYPES,
   CONTACT_MEDIUMS,
   SOCIAL_NETWORKS,
   labelOf,
 } from "@/lib/form-options";
-import {
-  fieldsForProduct,
-  ORDER_FIELD_META,
-  advisorFieldsForProduct,
-} from "@/lib/product-fields";
-import { orderFieldDisplay } from "@/lib/order-utils";
+import { ADVISOR_ITEM_KEYS } from "@/lib/product-fields";
+import type { OrderItemState } from "@/lib/order-utils";
 import {
   ORDER_STATUS_LABELS,
   ORDER_STATUS_STYLES,
   formatOrderNumber,
+  orderProductsLabel,
   toDateInput,
 } from "@/lib/order-display";
-import { AdvisorOrderForm } from "@/components/forms/order/advisor-order-form";
+import {
+  AdvisorOrderForm,
+  type AdvisorItemState,
+} from "@/components/forms/order/advisor-order-form";
+
+const s = (v?: string | null) => v ?? "";
 
 export default async function AsesorOrdenDetallePage({
   params,
@@ -38,49 +39,68 @@ export default async function AsesorOrdenDetallePage({
   const { id } = await params;
   const order = await prisma.order.findUnique({
     where: { id },
-    include: { user: { include: { clientProfile: true } } },
+    // El archivo del comprobante se descarga aparte (no se trae en la página).
+    omit: { depositReceiptData: true },
+    include: {
+      items: { orderBy: { position: "asc" } },
+      user: { include: { clientProfile: true } },
+    },
   });
   if (!order) notFound();
 
   const { user } = order;
   const profile = user.clientProfile;
-  const productValue = order.product ?? "";
+  const isAdmin = session.user.role === "ADMIN";
 
-  const view = {
-    product: productValue,
-    size: order.size ?? "",
-    sizeLady: order.sizeLady ?? "",
-    sizeGentleman: order.sizeGentleman ?? "",
-    material: order.material ?? "",
-    gemType: order.gemType ?? "",
-    engraving: order.engraving ?? "",
-    engravingLady: order.engravingLady ?? "",
-    engravingGentleman: order.engravingGentleman ?? "",
-    fontType: order.fontType ?? "",
-  };
-
-  const advisorFieldValues: Record<string, string> = {};
-  for (const k of advisorFieldsForProduct(productValue)) {
-    advisorFieldValues[k] = (order[k as keyof typeof order] as string) ?? "";
-  }
+  const items: AdvisorItemState[] = order.items.map((item) => {
+    const fields: Record<string, string> = {};
+    for (const key of ADVISOR_ITEM_KEYS) {
+      fields[key] = s(item[key as keyof typeof item] as string | null);
+    }
+    return {
+      id: item.id,
+      client: {
+        product: s(item.product),
+        size: s(item.size),
+        sizeLady: s(item.sizeLady),
+        sizeGentleman: s(item.sizeGentleman),
+        material: s(item.material),
+        gemType: s(item.gemType),
+        gemOther: s(item.gemOther),
+        engraving: s(item.engraving),
+        engravingLady: s(item.engravingLady),
+        engravingGentleman: s(item.engravingGentleman),
+        fontType: s(item.fontType),
+      } satisfies OrderItemState,
+      fields,
+    };
+  });
 
   const finalValues: Record<string, string> = {
     saleDate: toDateInput(order.saleDate),
+    jewelerDeliveryDate: toDateInput(order.jewelerDeliveryDate),
     deliveryFrom: toDateInput(order.deliveryFrom),
     deliveryTo: toDateInput(order.deliveryTo),
-    jewelerDeliveryDate: toDateInput(order.jewelerDeliveryDate),
-    estimatedDeliveryDate: toDateInput(order.estimatedDeliveryDate),
     purchaseValue: order.purchaseValue?.toString() ?? "",
     depositValue: order.depositValue?.toString() ?? "",
     shippingValue: order.shippingValue?.toString() ?? "",
-    balanceWithShipping: order.balanceWithShipping?.toString() ?? "",
-    depositReceiptUrl: order.depositReceiptUrl ?? "",
     deliveryType: order.deliveryType ?? "",
     paymentMethod: order.paymentMethod ?? "",
+    invoiceType: order.invoiceType ?? "",
     jeweler: order.jeweler ?? "",
-    finalDescription: order.finalDescription ?? "",
     internalNotes: order.internalNotes ?? "",
   };
+
+  // Solo el admin puede reasignar el asesor: cargamos las opciones.
+  const advisors = isAdmin
+    ? (
+        await prisma.user.findMany({
+          where: { role: { in: ["ASESOR", "ADMIN"] }, active: true },
+          orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+          select: { id: true, firstName: true, lastName: true },
+        })
+      ).map((a) => ({ id: a.id, name: `${a.firstName} ${a.lastName}` }))
+    : [];
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -98,7 +118,7 @@ export default async function AsesorOrdenDetallePage({
               {formatOrderNumber(order.number)}
             </span>
             <h1 className="text-2xl font-semibold text-edra-ink">
-              {labelOf(PRODUCTS, order.product)}
+              {orderProductsLabel(order.items, true)}
             </h1>
           </div>
           <span
@@ -138,41 +158,38 @@ export default async function AsesorOrdenDetallePage({
               <Row label="Ciudad o estado" value={profile.cityState ?? "—"} />
               <Row label="Código postal" value={profile.postalCode ?? "—"} />
               <Row label="Dirección" value={profile.address ?? "—"} />
+              <Row label="Barrio" value={profile.neighborhood ?? "—"} />
+              <Row
+                label="Especificaciones de la dirección"
+                value={profile.addressDetails ?? "—"}
+              />
             </>
           ) : null}
         </dl>
       </div>
 
-      {/* Solicitud del cliente */}
+      {/* Formulario del asesor (la solicitud del cliente va dentro, por producto) */}
       <div className="rounded-3xl bg-white p-6 shadow-[0_10px_40px_rgba(20,150,166,0.10)] sm:p-8">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-edra-grey">
-          Solicitud del cliente
-        </h2>
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
-          <Row label="Producto" value={labelOf(PRODUCTS, order.product)} />
-          {fieldsForProduct(productValue).map((key) => (
-            <Row
-              key={key}
-              label={ORDER_FIELD_META[key].label}
-              value={orderFieldDisplay(view, key)}
-            />
-          ))}
-        </dl>
-      </div>
-
-      {/* Formulario del asesor */}
-      <div className="rounded-3xl bg-white p-6 shadow-[0_10px_40px_rgba(20,150,166,0.10)] sm:p-8">
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-edra-grey">
-          Gestión del asesor
+          {isAdmin ? "Gestión de la orden" : "Gestión del asesor"}
         </h2>
         <AdvisorOrderForm
           orderId={order.id}
-          product={productValue}
+          canEditClient={isAdmin}
+          advisors={advisors}
           initial={{
             workOrderCode: order.workOrderCode ?? "",
             status: order.status,
-            fields: advisorFieldValues,
+            advisorId: order.advisorId ?? "",
+            items,
+            manufacturingNotes: order.manufacturingNotes ?? "",
             final: finalValues,
+            receipt: order.depositReceiptName
+              ? {
+                  name: order.depositReceiptName,
+                  size: order.depositReceiptSize,
+                }
+              : null,
           }}
         />
       </div>

@@ -86,6 +86,7 @@ export type AdvisorFieldKey =
   | "productName"
   | "productDescription"
   | "manufacturingNotes"
+  | "finalDescription"
   | "gemNotes";
 
 export const ADVISOR_FIELD_META: Record<
@@ -109,9 +110,18 @@ export const ADVISOR_FIELD_META: Record<
     label: "Observaciones de fabricación",
     multiline: true,
   },
+  finalDescription: { label: "Descripción del producto", multiline: true },
   gemNotes: { label: "Observación sobre las gemas", multiline: true },
 };
 
+/** Campos técnicos que se guardan en cada producto de la compra. */
+export const ADVISOR_ITEM_KEYS = (
+  Object.keys(ADVISOR_FIELD_META) as AdvisorFieldKey[]
+).filter((k) => k !== "manufacturingNotes");
+
+// Nota: `manufacturingNotes` (Observaciones de fabricación) no va aquí: se
+// diligencia al final del paso "Datos finales", igual para toda la compra.
+// `finalDescription` tampoco: se pide para cada producto en el paso 1.
 export const ADVISOR_PRODUCT_FIELDS: Record<string, AdvisorFieldKey[]> = {
   ARGOLLAS: [
     "weightLady",
@@ -119,29 +129,17 @@ export const ADVISOR_PRODUCT_FIELDS: Record<string, AdvisorFieldKey[]> = {
     "widthLady",
     "widthGentleman",
     "model",
-    "manufacturingNotes",
     "gemNotes",
   ],
-  ANILLOS: ["model", "manufacturingNotes", "gemNotes"],
-  SET_MATRIMONIAL: [
-    "widthLady",
-    "widthGentleman",
-    "model",
-    "manufacturingNotes",
-    "gemNotes",
-  ],
-  CINTILLO: ["model", "manufacturingNotes", "gemNotes"],
-  CADENA: ["weightApprox", "weaveType", "length", "manufacturingNotes"],
-  PULSERA: ["length", "model", "manufacturingNotes", "gemNotes"],
-  TOPOS: ["model", "manufacturingNotes", "gemNotes"],
-  CANDONGAS: ["model", "manufacturingNotes", "gemNotes"],
-  DIJE: ["model", "manufacturingNotes", "gemNotes"],
-  PERSONALIZADO: [
-    "productName",
-    "productDescription",
-    "manufacturingNotes",
-    "gemNotes",
-  ],
+  ANILLOS: ["model", "gemNotes"],
+  SET_MATRIMONIAL: ["widthLady", "widthGentleman", "model", "gemNotes"],
+  CINTILLO: ["model", "gemNotes"],
+  CADENA: ["weightApprox", "weaveType", "length"],
+  PULSERA: ["length", "model", "gemNotes"],
+  TOPOS: ["model", "gemNotes"],
+  CANDONGAS: ["model", "gemNotes"],
+  DIJE: ["model", "gemNotes"],
+  PERSONALIZADO: ["productName", "productDescription", "gemNotes"],
 };
 
 export function advisorFieldsForProduct(product?: string): AdvisorFieldKey[] {

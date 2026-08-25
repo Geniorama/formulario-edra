@@ -1,12 +1,13 @@
 import { prisma } from "@/lib/prisma";
-import { formatOrderNumber } from "@/lib/order-display";
-import { PRODUCTS, labelOf } from "@/lib/form-options";
+import { formatOrderNumber, orderProductsLabel } from "@/lib/order-display";
+
+type OrderProducts = { product: string | null }[];
 
 /** Notifica a todos los admins y asesores activos que se creó una orden. */
 export async function notifyStaffNewOrder(params: {
   orderId: string;
   number: number;
-  product: string | null;
+  items: OrderProducts;
   clientName: string;
 }) {
   const staff = await prisma.user.findMany({
@@ -15,7 +16,7 @@ export async function notifyStaffNewOrder(params: {
   });
   if (staff.length === 0) return;
 
-  const productLabel = labelOf(PRODUCTS, params.product);
+  const productLabel = orderProductsLabel(params.items, true);
   await prisma.notification.createMany({
     data: staff.map((s) => ({
       userId: s.id,
@@ -32,9 +33,9 @@ export async function notifyClientNewOrder(params: {
   orderId: string;
   number: number;
   clientId: string;
-  product: string | null;
+  items: OrderProducts;
 }) {
-  const productLabel = labelOf(PRODUCTS, params.product);
+  const productLabel = orderProductsLabel(params.items, true);
   await prisma.notification.create({
     data: {
       userId: params.clientId,
@@ -46,20 +47,41 @@ export async function notifyClientNewOrder(params: {
   });
 }
 
-/** Notifica al cliente que su orden cambió de estado. */
-export async function notifyClientStatusChange(params: {
+/**
+ * Notifica el cambio de estado al asesor de la orden (nunca al cliente).
+ * Si la orden aún no tiene asesor, avisa a todos los asesores/admins activos.
+ * Devuelve los destinatarios (para el envío de correo).
+ */
+export async function notifyAdvisorStatusChange(params: {
   orderId: string;
   number: number;
-  clientId: string;
+  advisorId: string | null;
+  actorId: string;
   statusLabel: string;
 }) {
-  await prisma.notification.create({
-    data: {
-      userId: params.clientId,
-      type: "ORDER_STATUS_CHANGED",
-      title: `Tu orden ${formatOrderNumber(params.number)} cambió de estado`,
+  const recipients = params.advisorId
+    ? await prisma.user.findMany({
+        where: { id: params.advisorId, active: true },
+        select: { id: true, email: true },
+      })
+    : await prisma.user.findMany({
+        where: { role: { in: ["ADMIN", "ASESOR"] }, active: true },
+        select: { id: true, email: true },
+      });
+
+  // Quien realiza el cambio no necesita que le avisen de su propia acción.
+  const targets = recipients.filter((r) => r.id !== params.actorId);
+  if (targets.length === 0) return [];
+
+  await prisma.notification.createMany({
+    data: targets.map((t) => ({
+      userId: t.id,
+      type: "ORDER_STATUS_CHANGED" as const,
+      title: `La orden ${formatOrderNumber(params.number)} cambió de estado`,
       body: `Nuevo estado: ${params.statusLabel}.`,
-      link: `/mis-ordenes/${params.orderId}`,
-    },
+      link: `/asesor/ordenes/${params.orderId}`,
+    })),
   });
+
+  return targets;
 }

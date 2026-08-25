@@ -1,12 +1,28 @@
+import { PRODUCTS, labelOf } from "@/lib/form-options";
 import type {
   OrderStatus,
   DeliveryType,
   PaymentMethod,
+  InvoiceType,
 } from "@/generated/prisma/enums";
 
 /** Número de orden visible para el cliente, p. ej. EDRA-00042. */
 export function formatOrderNumber(n: number): string {
   return `EDRA-${String(n).padStart(5, "0")}`;
+}
+
+/**
+ * Resume los productos de una compra.
+ * `full` lista todos ("Argollas, Dije"); si no, abrevia ("Argollas +1 más").
+ */
+export function orderProductsLabel(
+  items: { product: string | null }[],
+  full = false
+): string {
+  if (items.length === 0) return "—";
+  const labels = items.map((i) => labelOf(PRODUCTS, i.product));
+  if (labels.length === 1) return labels[0];
+  return full ? labels.join(", ") : `${labels[0]} +${labels.length - 1} más`;
 }
 
 export const DELIVERY_TYPE_OPTIONS: { value: DeliveryType; label: string }[] = [
@@ -25,6 +41,15 @@ export const PAYMENT_METHOD_OPTIONS: { value: PaymentMethod; label: string }[] =
     { value: "TRANSFERENCIA", label: "Transferencia" },
     { value: "EFECTIVO", label: "Efectivo" },
   ];
+
+export const INVOICE_TYPE_OPTIONS: { value: InvoiceType; label: string }[] = [
+  { value: "CON_FE", label: "Con FE" },
+  { value: "SIN_FE", label: "Sin FE" },
+];
+
+export function invoiceTypeLabel(v?: InvoiceType | null): string {
+  return INVOICE_TYPE_OPTIONS.find((o) => o.value === v)?.label ?? "—";
+}
 
 export function deliveryTypeLabel(v?: DeliveryType | null): string {
   return DELIVERY_TYPE_OPTIONS.find((o) => o.value === v)?.label ?? "—";
@@ -57,25 +82,53 @@ export function toDateInput(d?: Date | null): string {
 }
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
-  PENDIENTE: "Pendiente",
-  EN_PROCESO: "En proceso",
+  EN_TRAMITE: "En trámite",
+  EN_FABRICACION: "En fabricación",
+  ENGASTE: "Engaste",
+  NOVEDAD_FABRICACION: "Novedad de fabricación",
   FINALIZADO: "Finalizado",
   ENTREGADO: "Entregado",
-  CANCELADO: "Cancelado",
+  DESISTIDO: "Desistido",
 };
 
 export const ORDER_STATUS_STYLES: Record<OrderStatus, string> = {
-  PENDIENTE: "bg-amber-50 text-amber-700",
-  EN_PROCESO: "bg-edra-soft text-edra-dark",
+  EN_TRAMITE: "bg-amber-50 text-amber-700",
+  EN_FABRICACION: "bg-edra-soft text-edra-dark",
+  ENGASTE: "bg-indigo-50 text-indigo-700",
+  NOVEDAD_FABRICACION: "bg-orange-50 text-orange-700",
   FINALIZADO: "bg-emerald-50 text-emerald-700",
   ENTREGADO: "bg-emerald-100 text-emerald-800",
-  CANCELADO: "bg-red-50 text-red-600",
+  DESISTIDO: "bg-red-50 text-red-600",
 };
 
+// Orden de aparición en los selectores (flujo de fabricación).
 export const ORDER_STATUS_OPTIONS: { value: OrderStatus; label: string }[] = [
-  { value: "PENDIENTE", label: "Pendiente" },
-  { value: "EN_PROCESO", label: "En proceso" },
-  { value: "FINALIZADO", label: "Finalizado" },
-  { value: "ENTREGADO", label: "Entregado" },
-  { value: "CANCELADO", label: "Cancelado" },
+  { value: "EN_TRAMITE", label: ORDER_STATUS_LABELS.EN_TRAMITE },
+  { value: "EN_FABRICACION", label: ORDER_STATUS_LABELS.EN_FABRICACION },
+  { value: "ENGASTE", label: ORDER_STATUS_LABELS.ENGASTE },
+  {
+    value: "NOVEDAD_FABRICACION",
+    label: ORDER_STATUS_LABELS.NOVEDAD_FABRICACION,
+  },
+  { value: "FINALIZADO", label: ORDER_STATUS_LABELS.FINALIZADO },
+  { value: "ENTREGADO", label: ORDER_STATUS_LABELS.ENTREGADO },
+  { value: "DESISTIDO", label: ORDER_STATUS_LABELS.DESISTIDO },
 ];
+
+/** Saldo con envío = valor compra − valor abono + valor envío. */
+export function computeBalanceWithShipping(values: {
+  purchaseValue?: number | string | null;
+  depositValue?: number | string | null;
+  shippingValue?: number | string | null;
+}): number | null {
+  const toNumber = (v: number | string | null | undefined) => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = typeof v === "number" ? v : parseInt(String(v).replace(/\D/g, ""), 10);
+    return Number.isFinite(n) ? n : null;
+  };
+  const purchase = toNumber(values.purchaseValue);
+  const deposit = toNumber(values.depositValue);
+  const shipping = toNumber(values.shippingValue);
+  if (purchase === null && deposit === null && shipping === null) return null;
+  return (purchase ?? 0) - (deposit ?? 0) + (shipping ?? 0);
+}

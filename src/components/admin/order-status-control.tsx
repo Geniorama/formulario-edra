@@ -25,7 +25,7 @@ export function OrderStatusControl({
     if (next === status || busy) return;
 
     const ok = window.confirm(
-      `¿Cambiar el estado de la orden a "${ORDER_STATUS_LABELS[next]}"? Se notificará al cliente por correo.`
+      `¿Cambiar el estado de la orden a "${ORDER_STATUS_LABELS[next]}"? Se notificará al asesor por correo.`
     );
     if (!ok) return; // el select se revierte solo (es controlado por `status`)
 

@@ -19,6 +19,7 @@ export default async function CompletarRegistroPage() {
   const order = await prisma.order.findFirst({
     where: { userId: session.user.id },
     orderBy: { createdAt: "asc" },
+    include: { items: { orderBy: { position: "asc" } } },
   });
 
   const initialPersonal = {
@@ -32,21 +33,24 @@ export default async function CompletarRegistroPage() {
     cityState: s(profile?.cityState),
     postalCode: s(profile?.postalCode),
     address: s(profile?.address),
+    neighborhood: s(profile?.neighborhood),
+    addressDetails: s(profile?.addressDetails),
     privacyAccepted: profile?.privacyAccepted ?? false,
   };
 
-  const initialOrder = {
-    product: s(order?.product),
-    size: s(order?.size),
-    sizeLady: s(order?.sizeLady),
-    sizeGentleman: s(order?.sizeGentleman),
-    material: s(order?.material),
-    gemType: s(order?.gemType),
-    engraving: s(order?.engraving),
-    engravingLady: s(order?.engravingLady),
-    engravingGentleman: s(order?.engravingGentleman),
-    fontType: s(order?.fontType),
-  };
+  const initialItems = (order?.items ?? []).map((item) => ({
+    product: s(item.product),
+    size: s(item.size),
+    sizeLady: s(item.sizeLady),
+    sizeGentleman: s(item.sizeGentleman),
+    material: s(item.material),
+    gemType: s(item.gemType),
+    gemOther: s(item.gemOther),
+    engraving: s(item.engraving),
+    engravingLady: s(item.engravingLady),
+    engravingGentleman: s(item.engravingGentleman),
+    fontType: s(item.fontType),
+  }));
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-10">
@@ -61,7 +65,7 @@ export default async function CompletarRegistroPage() {
       </div>
       <ClientOnboardingForm
         initialPersonal={initialPersonal}
-        initialOrder={initialOrder}
+        initialItems={initialItems}
         initialStep={profile?.lastStep ?? 0}
       />
     </section>

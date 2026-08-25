@@ -3,11 +3,12 @@ import { redirect } from "next/navigation";
 import { Plus, ChevronRight } from "lucide-react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { PRODUCTS, labelOf } from "@/lib/form-options";
+import { PRODUCTS } from "@/lib/form-options";
 import {
   ORDER_STATUS_LABELS,
   ORDER_STATUS_STYLES,
   formatOrderNumber,
+  orderProductsLabel,
 } from "@/lib/order-display";
 import { OrdersSearch } from "@/components/admin/orders-search";
 import { Pagination } from "@/components/admin/pagination";
@@ -43,7 +44,7 @@ export default async function MisOrdenesPage({
             { workOrderCode: { contains: q, mode: "insensitive" } },
             ...(digits ? [{ number: parseInt(digits, 10) }] : []),
             ...(matchedProducts.length
-              ? [{ product: { in: matchedProducts } }]
+              ? [{ items: { some: { product: { in: matchedProducts } } } }]
               : []),
           ],
         }
@@ -60,10 +61,10 @@ export default async function MisOrdenesPage({
       select: {
         id: true,
         number: true,
-        product: true,
         status: true,
         workOrderCode: true,
         createdAt: true,
+        items: { select: { product: true }, orderBy: { position: "asc" } },
       },
     }),
   ]);
@@ -110,7 +111,7 @@ export default async function MisOrdenesPage({
                     {formatOrderNumber(o.number)}
                   </p>
                   <p className="font-semibold text-edra-ink">
-                    {labelOf(PRODUCTS, o.product)}
+                    {orderProductsLabel(o.items)}
                   </p>
                   <p className="mt-1 text-xs text-edra-grey">
                     {o.workOrderCode ? `Código: ${o.workOrderCode} · ` : ""}
@@ -132,7 +133,7 @@ export default async function MisOrdenesPage({
             totalPages={totalPages}
             total={total}
             basePath="/mis-ordenes"
-            q={q}
+            params={{ q }}
           />
         </>
       )}

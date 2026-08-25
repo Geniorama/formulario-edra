@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { workOrderSchema } from "@/lib/validations";
-import { sanitizeOrder } from "@/lib/client-registration";
+import { sanitizeOrderItems } from "@/lib/client-registration";
 import { notifyClientNewOrder } from "@/lib/notifications";
 
 // El asesor (o admin) crea una orden a nombre de un cliente registrado.
@@ -49,9 +49,18 @@ export async function POST(request: Request) {
     data: {
       userId: client.id,
       advisorId: session.user.id, // el asesor que la crea queda como gestor
-      ...sanitizeOrder(parsed.data as Record<string, unknown>),
+      items: {
+        create: sanitizeOrderItems(parsed.data.items).map((item, position) => ({
+          ...item,
+          position,
+        })),
+      },
     },
-    select: { id: true, number: true, product: true },
+    select: {
+      id: true,
+      number: true,
+      items: { select: { product: true }, orderBy: { position: "asc" } },
+    },
   });
 
   try {
@@ -59,7 +68,7 @@ export async function POST(request: Request) {
       orderId: order.id,
       number: order.number,
       clientId: client.id,
-      product: order.product,
+      items: order.items,
     });
   } catch (e) {
     console.error("Error notificando nueva orden al cliente:", e);

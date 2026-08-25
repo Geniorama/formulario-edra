@@ -45,6 +45,13 @@ export const SHIPPING_COUNTRIES = [
   "Estados Unidos",
 ] as const;
 
+// El código postal solo es obligatorio para envíos fuera de Colombia.
+export const LOCAL_COUNTRY = "Colombia";
+
+export function postalCodeRequired(shippingCountry?: string | null): boolean {
+  return Boolean(shippingCountry) && shippingCountry !== LOCAL_COUNTRY;
+}
+
 export const PRODUCTS = [
   { value: "ARGOLLAS", label: "Argollas" },
   { value: "ANILLOS", label: "Anillos" },
@@ -58,19 +65,38 @@ export const PRODUCTS = [
   { value: "PERSONALIZADO", label: "Producto personalizado / otro" },
 ] as const;
 
-export const SIZES = [
-  "3", "3.5", "4", "4.5", "5", "5.5", "6", "6.5", "7", "7.5", "8",
-  "8.5", "9", "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13",
-] as const;
+// Tallas de 3 a 13 en cuartos. El valor se guarda en decimal ("5.25") y se
+// muestra en cuartos ("5 1/4"); las tallas antiguas ("3.5") siguen sirviendo.
+const QUARTER_LABELS = ["", " 1/4", " 1/2", " 3/4"] as const;
+
+export const SIZES: { value: string; label: string }[] = (() => {
+  const out: { value: string; label: string }[] = [];
+  for (let whole = 3; whole <= 13; whole++) {
+    for (let q = 0; q < QUARTER_LABELS.length; q++) {
+      if (whole === 13 && q > 0) break; // la lista termina en la talla 13
+      out.push({
+        value: String(whole + q * 0.25),
+        label: `${whole}${QUARTER_LABELS[q]}`,
+      });
+    }
+  }
+  return out;
+})();
+
+/** Muestra una talla en cuartos ("5.25" → "5 1/4"). */
+export function sizeLabel(value?: string | null): string {
+  if (!value) return "—";
+  return SIZES.find((s) => s.value === value)?.label ?? value;
+}
 
 export const MATERIALS = [
   { value: "ORO_10K", label: "Oro 10k" },
   { value: "ORO_14K", label: "Oro 14k" },
   { value: "ORO_18K", label: "Oro 18k" },
-  { value: "ORO_22K", label: "Oro 22k" },
-  { value: "ORO_24K", label: "Oro 24k" },
+  { value: "ORO_18K_PLATA", label: "Oro 18k + plata" },
   { value: "PLATA_925", label: "Plata 925" },
   { value: "PLATA_950", label: "Plata 950" },
+  { value: "PLATINO_950", label: "Platino 950" },
 ] as const;
 
 export const GEM_TYPES = [

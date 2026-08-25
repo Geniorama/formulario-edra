@@ -54,22 +54,27 @@ export async function POST(request: Request) {
         { status: 422 }
       );
     }
-    await persistRegistration(userId, parsed.data.personal, parsed.data.order, {
-      completed: true,
-      lastStep: 2,
-    });
+    const orderId = await persistRegistration(
+      userId,
+      parsed.data.personal,
+      parsed.data.order,
+      { completed: true, lastStep: 2 }
+    );
 
     try {
-      const order = await prisma.order.findFirst({
-        where: { userId },
-        orderBy: { createdAt: "asc" },
-        select: { id: true, number: true, product: true },
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          number: true,
+          items: { select: { product: true }, orderBy: { position: "asc" } },
+        },
       });
       if (order) {
         await notifyStaffNewOrder({
           orderId: order.id,
           number: order.number,
-          product: order.product,
+          items: order.items,
           clientName: session.user.name ?? "Un cliente",
         });
       }

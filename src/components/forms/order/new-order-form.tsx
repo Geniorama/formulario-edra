@@ -3,43 +3,19 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { OrderFields } from "./order-fields";
-import {
-  emptyOrder,
-  validateOrderState,
-  type OrderState,
-} from "@/lib/order-utils";
-import type { OrderFieldKey } from "@/lib/product-fields";
+import { OrderItemsEditor } from "./order-fields";
+import { useOrderItems } from "./use-order-items";
 import { SubmitButton, FormAlert } from "@/components/ui/form-fields";
 
 export function NewOrderForm() {
   const router = useRouter();
-  const [order, setOrder] = useState<OrderState>(emptyOrder);
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const { items, errors, valid, handlers, revealErrors } = useOrderItems();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function onField(key: OrderFieldKey, value: string) {
-    setOrder((p) => ({ ...p, [key]: value }));
-    setTouched((p) => ({ ...p, [key]: true }));
-  }
-  function onProduct(value: string) {
-    setOrder({ ...emptyOrder, product: value });
-    setTouched((p) => ({ ...p, product: true }));
-  }
-
-  const allErrors = validateOrderState(order);
-  const errors: Record<string, string> = {};
-  for (const k in allErrors) if (touched[k]) errors[k] = allErrors[k];
-
   async function submit() {
-    const e = validateOrderState(order);
-    if (Object.keys(e).length > 0) {
-      setTouched((prev) => {
-        const t = { ...prev };
-        for (const k in e) t[k] = true;
-        return t;
-      });
+    if (!valid) {
+      revealErrors();
       return;
     }
     setLoading(true);
@@ -48,7 +24,7 @@ export function NewOrderForm() {
       const res = await fetch("/api/cliente/ordenes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(order),
+        body: JSON.stringify({ items }),
       });
       const body = await res.json();
       setLoading(false);
@@ -72,12 +48,7 @@ export function NewOrderForm() {
         </div>
       ) : null}
 
-      <OrderFields
-        order={order}
-        onField={onField}
-        onProduct={onProduct}
-        errors={errors}
-      />
+      <OrderItemsEditor items={items} errors={errors} {...handlers} />
 
       <div className="mt-8 flex items-center justify-between gap-3">
         <Link

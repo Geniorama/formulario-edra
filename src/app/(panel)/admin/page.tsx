@@ -6,13 +6,46 @@ import {
   AdminUsersTable,
   type AdminUser,
 } from "@/components/admin/admin-users-table";
+import { UsersFilters } from "@/components/admin/users-filters";
+import { roleEnum } from "@/lib/validations";
+import type { Prisma } from "@/generated/prisma/client";
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; rol?: string; estado?: string }>;
+}) {
   const session = await auth();
   if (!session?.user) redirect("/login");
   if (session.user.role !== "ADMIN") redirect("/dashboard");
 
+  const sp = await searchParams;
+  const q = (sp.q ?? "").trim();
+  const rolRaw = (sp.rol ?? "").trim();
+  const estado = (sp.estado ?? "").trim();
+
+  const rol = roleEnum.safeParse(rolRaw);
+  const filters: Prisma.UserWhereInput[] = [];
+
+  if (q) {
+    filters.push({
+      OR: [
+        { firstName: { contains: q, mode: "insensitive" } },
+        { lastName: { contains: q, mode: "insensitive" } },
+        { email: { contains: q, mode: "insensitive" } },
+      ],
+    });
+  }
+  if (rol.success) filters.push({ role: rol.data });
+  if (estado === "ACTIVO") filters.push({ active: true, emailVerified: { not: null } });
+  else if (estado === "PENDIENTE") filters.push({ active: true, emailVerified: null });
+  else if (estado === "INACTIVO") filters.push({ active: false });
+
+  const where: Prisma.UserWhereInput = filters.length ? { AND: filters } : {};
+  const hasFilters = Boolean(q || rolRaw || estado);
+
   const rows = await prisma.user.findMany({
+    where,
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
@@ -59,7 +92,16 @@ export default async function AdminPage() {
         <h2 className="mb-6 text-lg font-semibold text-edra-ink">
           Usuarios ({users.length})
         </h2>
-        <AdminUsersTable users={users} currentUserId={session.user.id} />
+        <UsersFilters initial={{ q, rol: rolRaw, estado }} />
+        {users.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-edra-grey/30 p-8 text-center text-sm text-edra-grey">
+            {hasFilters
+              ? "No se encontraron usuarios con esos filtros."
+              : "Aún no hay usuarios registrados."}
+          </p>
+        ) : (
+          <AdminUsersTable users={users} currentUserId={session.user.id} />
+        )}
       </div>
     </div>
   );

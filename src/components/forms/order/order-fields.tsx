@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText } from "lucide-react";
+import { FileText, Plus, Trash2 } from "lucide-react";
 import { Field, SelectField } from "@/components/ui/form-fields";
 import {
   PRODUCTS,
@@ -15,22 +15,26 @@ import {
   ORDER_FIELD_META,
   type OrderFieldKey,
 } from "@/lib/product-fields";
-import type { OrderState, Errors } from "@/lib/order-utils";
+import { MAX_ORDER_ITEMS } from "@/lib/validations";
+import type { OrderItemState, Errors } from "@/lib/order-utils";
 
-export function OrderFields({
-  order,
+/** Campos del cliente para UN producto de la compra. */
+export function OrderItemFields({
+  item,
   onField,
   onProduct,
+  onGemOther,
   errors,
 }: {
-  order: OrderState;
+  item: OrderItemState;
   onField: (key: OrderFieldKey, value: string) => void;
   onProduct: (value: string) => void;
+  onGemOther: (value: string) => void;
   errors: Errors;
 }) {
   function renderField(key: OrderFieldKey) {
     const meta = ORDER_FIELD_META[key];
-    const value = order[key];
+    const value = item[key];
     const err = errors[key];
 
     if (meta.kind === "engraving") {
@@ -54,7 +58,7 @@ export function OrderFields({
 
     const opts: readonly { value: string; label: string }[] =
       meta.kind === "size"
-        ? SIZES.map((s) => ({ value: s, label: s }))
+        ? SIZES
         : meta.kind === "material"
           ? MATERIALS
           : meta.kind === "gem"
@@ -78,6 +82,26 @@ export function OrderFields({
       </SelectField>
     );
 
+    // Al elegir "Otra" gema se pide escribir de cuál se trata.
+    if (meta.kind === "gem") {
+      return (
+        <div key={key} className="space-y-3">
+          {select}
+          {value === "OTRA" ? (
+            <Field
+              label="¿Qué tipo de gema?"
+              value={item.gemOther}
+              onChange={(e) => onGemOther(e.target.value)}
+              placeholder="Escribe el tipo de gema"
+              maxLength={80}
+              error={errors.gemOther}
+            />
+          ) : null}
+        </div>
+      );
+    }
+
+    // El selector de fuente incluye el enlace a la guía visual.
     if (meta.kind === "font") {
       return (
         <div key={key}>
@@ -98,13 +122,13 @@ export function OrderFields({
     return <div key={key}>{select}</div>;
   }
 
-  const keys = fieldsForProduct(order.product);
+  const keys = fieldsForProduct(item.product);
 
   return (
     <div className="space-y-5">
       <SelectField
         label="Selecciona el producto"
-        value={order.product}
+        value={item.product}
         onChange={(e) => onProduct(e.target.value)}
         error={errors.product}
       >
@@ -116,7 +140,7 @@ export function OrderFields({
         ))}
       </SelectField>
 
-      {order.product ? (
+      {item.product ? (
         <>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             {keys
@@ -132,6 +156,75 @@ export function OrderFields({
       ) : (
         <p className="text-sm text-edra-grey">
           Selecciona un producto para ver los campos correspondientes.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Lista editable de productos: el cliente puede pedir varios en una compra. */
+export function OrderItemsEditor({
+  items,
+  errors,
+  onItemField,
+  onItemProduct,
+  onItemGemOther,
+  onAdd,
+  onRemove,
+}: {
+  items: OrderItemState[];
+  errors: Errors[];
+  onItemField: (index: number, key: OrderFieldKey, value: string) => void;
+  onItemProduct: (index: number, value: string) => void;
+  onItemGemOther: (index: number, value: string) => void;
+  onAdd: () => void;
+  onRemove: (index: number) => void;
+}) {
+  return (
+    <div className="space-y-5">
+      {items.map((item, index) => (
+        <div
+          key={index}
+          className="rounded-2xl border border-black/5 bg-edra-bg/30 p-5"
+        >
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold uppercase tracking-wide text-edra-grey">
+              Producto {index + 1}
+            </p>
+            {items.length > 1 ? (
+              <button
+                type="button"
+                onClick={() => onRemove(index)}
+                className="inline-flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-600"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Quitar
+              </button>
+            ) : null}
+          </div>
+
+          <OrderItemFields
+            item={item}
+            errors={errors[index] ?? {}}
+            onField={(key, value) => onItemField(index, key, value)}
+            onProduct={(value) => onItemProduct(index, value)}
+            onGemOther={(value) => onItemGemOther(index, value)}
+          />
+        </div>
+      ))}
+
+      {items.length < MAX_ORDER_ITEMS ? (
+        <button
+          type="button"
+          onClick={onAdd}
+          className="inline-flex items-center gap-2 rounded-full border border-dashed border-edra/50 px-5 py-2.5 text-sm font-semibold text-edra transition-colors hover:border-edra hover:bg-edra-soft"
+        >
+          <Plus className="h-4 w-4" />
+          Agregar otro producto
+        </button>
+      ) : (
+        <p className="text-xs text-edra-grey">
+          Alcanzaste el máximo de {MAX_ORDER_ITEMS} productos por compra.
         </p>
       )}
     </div>

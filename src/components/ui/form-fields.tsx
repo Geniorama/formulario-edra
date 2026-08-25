@@ -64,18 +64,24 @@ export function MoneyField({
   optional,
   value,
   onChange,
+  readOnly,
+  hint,
   className = "",
 }: {
   label: string;
   error?: string;
   optional?: boolean;
   value: string; // dígitos crudos, p. ej. "1500000"
-  onChange: (rawDigits: string) => void;
+  onChange?: (rawDigits: string) => void;
+  readOnly?: boolean; // campo calculado: se muestra pero no se edita
+  hint?: string;
   className?: string;
 }) {
-  const digits = (value ?? "").replace(/\D/g, "");
+  const raw = (value ?? "").trim();
+  const negative = raw.startsWith("-");
+  const digits = raw.replace(/\D/g, "");
   const display = digits
-    ? new Intl.NumberFormat("es-CO").format(Number(digits))
+    ? `${negative ? "-" : ""}${new Intl.NumberFormat("es-CO").format(Number(digits))}`
     : "";
   return (
     <div className={className}>
@@ -88,13 +94,106 @@ export function MoneyField({
           type="text"
           inputMode="numeric"
           value={display}
-          onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
+          onChange={(e) => onChange?.(e.target.value.replace(/\D/g, ""))}
           placeholder="0"
+          readOnly={readOnly}
+          aria-readonly={readOnly}
+          tabIndex={readOnly ? -1 : undefined}
           className={`${baseInput} pl-8 ${
-            error ? "border-red-400 focus:border-red-400" : ""
-          }`}
+            readOnly
+              ? "cursor-not-allowed border-edra-grey/20 bg-edra-bg/60 text-edra-ink/80 focus:border-edra-grey/20"
+              : ""
+          } ${error ? "border-red-400 focus:border-red-400" : ""}`}
         />
       </div>
+      {hint ? <p className="mt-1.5 text-xs text-edra-grey">{hint}</p> : null}
+      {error ? <p className="mt-1.5 text-xs text-red-500">{error}</p> : null}
+    </div>
+  );
+}
+
+/** Campo de archivo adjunto: sube al servidor y muestra el archivo actual. */
+export function FileField({
+  label,
+  optional,
+  fileName,
+  fileHref,
+  accept,
+  hint,
+  busy,
+  error,
+  onSelect,
+  onRemove,
+  className = "",
+}: {
+  label: string;
+  optional?: boolean;
+  fileName?: string | null;
+  fileHref?: string;
+  accept?: string;
+  hint?: string;
+  busy?: boolean;
+  error?: string;
+  onSelect: (file: File) => void;
+  onRemove?: () => void;
+  className?: string;
+}) {
+  const inputId = `file-${label.replace(/\s+/g, "-").toLowerCase()}`;
+  return (
+    <div className={className}>
+      <FieldLabel label={label} optional={optional} />
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-dashed border-edra-grey/30 bg-white px-5 py-4">
+        <label
+          htmlFor={inputId}
+          className={`cursor-pointer rounded-full border border-edra px-4 py-2 text-xs font-semibold text-edra transition-colors hover:bg-edra hover:text-white ${
+            busy ? "pointer-events-none opacity-60" : ""
+          }`}
+        >
+          {busy ? "Subiendo…" : fileName ? "Reemplazar archivo" : "Subir archivo"}
+        </label>
+        <input
+          id={inputId}
+          type="file"
+          accept={accept}
+          className="sr-only"
+          disabled={busy}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) onSelect(file);
+            e.target.value = ""; // permite volver a subir el mismo archivo
+          }}
+        />
+
+        {fileName ? (
+          <>
+            {fileHref ? (
+              <a
+                href={fileHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-medium text-edra underline underline-offset-2 hover:text-edra-dark"
+              >
+                {fileName}
+              </a>
+            ) : (
+              <span className="text-xs text-edra-ink">{fileName}</span>
+            )}
+            {onRemove ? (
+              <button
+                type="button"
+                onClick={onRemove}
+                disabled={busy}
+                className="text-xs font-medium text-red-500 hover:text-red-600 disabled:opacity-50"
+              >
+                Eliminar
+              </button>
+            ) : null}
+          </>
+        ) : (
+          <span className="text-xs text-edra-grey">Ningún archivo cargado.</span>
+        )}
+      </div>
+      {hint ? <p className="mt-1.5 text-xs text-edra-grey">{hint}</p> : null}
       {error ? <p className="mt-1.5 text-xs text-red-500">{error}</p> : null}
     </div>
   );

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { AlertTriangle, FileText } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import {
   Field,
   SelectField,
@@ -13,24 +13,19 @@ import {
   FormAlert,
 } from "@/components/ui/form-fields";
 import { Stepper } from "./stepper";
+import { OrderItemsEditor } from "@/components/forms/order/order-fields";
+import { useOrderItems } from "@/components/forms/order/use-order-items";
 import {
   DOCUMENT_TYPES,
   CONTACT_MEDIUMS,
   SOCIAL_NETWORKS,
   SHIPPING_COUNTRIES,
   PRODUCTS,
-  SIZES,
-  MATERIALS,
-  GEM_TYPES,
-  FONT_TYPES,
-  FONT_GUIDE_URL,
+  postalCodeRequired,
   labelOf,
 } from "@/lib/form-options";
-import {
-  fieldsForProduct,
-  ORDER_FIELD_META,
-  type OrderFieldKey,
-} from "@/lib/product-fields";
+import { fieldsForProduct, ORDER_FIELD_META } from "@/lib/product-fields";
+import { orderFieldDisplay, type OrderItemState } from "@/lib/order-utils";
 
 const STEPS = ["Datos personales", "Orden de trabajo", "Confirmación"];
 
@@ -45,20 +40,9 @@ type Personal = {
   cityState: string;
   postalCode: string;
   address: string;
+  neighborhood: string;
+  addressDetails: string;
   privacyAccepted: boolean;
-};
-
-type Order = {
-  product: string;
-  size: string;
-  sizeLady: string;
-  sizeGentleman: string;
-  material: string;
-  gemType: string;
-  engraving: string;
-  engravingLady: string;
-  engravingGentleman: string;
-  fontType: string;
 };
 
 const emptyPersonal: Personal = {
@@ -72,31 +56,20 @@ const emptyPersonal: Personal = {
   cityState: "",
   postalCode: "",
   address: "",
+  neighborhood: "",
+  addressDetails: "",
   privacyAccepted: false,
-};
-
-const emptyOrder: Order = {
-  product: "",
-  size: "",
-  sizeLady: "",
-  sizeGentleman: "",
-  material: "",
-  gemType: "",
-  engraving: "",
-  engravingLady: "",
-  engravingGentleman: "",
-  fontType: "",
 };
 
 type Errors = Record<string, string>;
 
 export function ClientOnboardingForm({
   initialPersonal,
-  initialOrder,
+  initialItems,
   initialStep = 0,
 }: {
   initialPersonal?: Personal;
-  initialOrder?: Order;
+  initialItems?: OrderItemState[];
   initialStep?: number;
 } = {}) {
   const router = useRouter();
@@ -104,7 +77,13 @@ export function ClientOnboardingForm({
   const [personal, setPersonal] = useState<Personal>(
     initialPersonal ?? emptyPersonal
   );
-  const [order, setOrder] = useState<Order>(initialOrder ?? emptyOrder);
+  const {
+    items,
+    errors: itemErrors,
+    valid: itemsValid,
+    handlers,
+    revealErrors,
+  } = useOrderItems(initialItems);
   // Campos que el usuario ya tocó (para no mostrar errores en pristinos).
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -115,15 +94,6 @@ export function ClientOnboardingForm({
   function setP<K extends keyof Personal>(key: K, value: Personal[K]) {
     setPersonal((prev) => ({ ...prev, [key]: value }));
     setTouched((prev) => ({ ...prev, [key]: true }));
-  }
-  function setO<K extends keyof Order>(key: K, value: Order[K]) {
-    setOrder((prev) => ({ ...prev, [key]: value }));
-    setTouched((prev) => ({ ...prev, [key]: true }));
-  }
-  // Al cambiar de producto se limpian los campos dependientes y sus errores.
-  function selectProduct(product: string) {
-    setOrder({ ...emptyOrder, product });
-    setTouched((prev) => ({ ...prev, product: true }));
   }
 
   function validatePersonal(): Errors {
@@ -141,110 +111,13 @@ export function ClientOnboardingForm({
     }
     if (!personal.shippingCountry) e.shippingCountry = "Selecciona el país de envío";
     if (!personal.cityState.trim()) e.cityState = "Ingresa la ciudad o estado";
+    // El código postal solo es obligatorio para envíos fuera de Colombia.
+    if (postalCodeRequired(personal.shippingCountry) && !personal.postalCode.trim())
+      e.postalCode = "Obligatorio para envíos fuera de Colombia";
     if (personal.address.trim().length < 3) e.address = "Ingresa la dirección";
     if (!personal.privacyAccepted)
       e.privacyAccepted = "Debes aceptar la política de privacidad";
     return e;
-  }
-
-  function validateOrder(): Errors {
-    const e: Errors = {};
-    if (!order.product) {
-      e.product = "Selecciona el producto";
-      return e;
-    }
-    for (const key of fieldsForProduct(order.product)) {
-      const meta = ORDER_FIELD_META[key];
-      const value = order[key];
-      if (meta.required && !value) {
-        e[key] = `Selecciona ${meta.label.toLowerCase()}`;
-      }
-      if (meta.kind === "engraving" && value.length > 25) {
-        e[key] = "Máximo 25 caracteres";
-      }
-    }
-    return e;
-  }
-
-  // Renderiza un campo de la orden según su tipo.
-  function renderOrderField(key: OrderFieldKey) {
-    const meta = ORDER_FIELD_META[key];
-    const value = order[key];
-    const err = errors[key];
-
-    if (meta.kind === "engraving") {
-      return (
-        <div key={key}>
-          <Field
-            label={meta.label}
-            value={value}
-            onChange={(e) => setO(key, e.target.value)}
-            placeholder="Texto a grabar"
-            maxLength={25}
-            error={err}
-            optional={!meta.required}
-          />
-          <p className="mt-1 text-xs text-edra-grey">
-            {value.length}/25 caracteres
-          </p>
-        </div>
-      );
-    }
-
-    const opts: readonly { value: string; label: string }[] =
-      meta.kind === "size"
-        ? SIZES.map((s) => ({ value: s, label: s }))
-        : meta.kind === "material"
-          ? MATERIALS
-          : meta.kind === "gem"
-            ? GEM_TYPES
-            : FONT_TYPES.map((f) => ({ value: f, label: f }));
-
-    const select = (
-      <SelectField
-        label={meta.label}
-        value={value}
-        onChange={(e) => setO(key, e.target.value)}
-        error={err}
-        optional={!meta.required}
-      >
-        <option value="">Selecciona...</option>
-        {opts.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </SelectField>
-    );
-
-    // El selector de fuente incluye el enlace a la guía visual.
-    if (meta.kind === "font") {
-      return (
-        <div key={key}>
-          {select}
-          <a
-            href={FONT_GUIDE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-edra hover:text-edra-dark"
-          >
-            <FileText className="h-3.5 w-3.5" />
-            Ver guía de fuentes y símbolos
-          </a>
-        </div>
-      );
-    }
-
-    return <div key={key}>{select}</div>;
-  }
-
-  function orderFieldDisplay(key: OrderFieldKey): string {
-    const meta = ORDER_FIELD_META[key];
-    const value = order[key];
-    if (!value) return "—";
-    if (meta.kind === "material") return labelOf(MATERIALS, value);
-    if (meta.kind === "gem") return labelOf(GEM_TYPES, value);
-    return value;
   }
 
   // Guarda el borrador en la BD (datos parciales, sin validar).
@@ -255,7 +128,12 @@ export function ClientOnboardingForm({
       const res = await fetch("/api/cliente/registro", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ personal, order, step: stepToSave, finalize: false }),
+        body: JSON.stringify({
+          personal,
+          order: { items },
+          step: stepToSave,
+          finalize: false,
+        }),
       });
       if (res.ok) setSavedMsg("Progreso guardado");
     } catch {
@@ -266,19 +144,25 @@ export function ClientOnboardingForm({
   }
 
   function next() {
-    const e = step === 0 ? validatePersonal() : validateOrder();
-    if (Object.keys(e).length === 0) {
+    const e = step === 0 ? validatePersonal() : {};
+    const stepOk = step === 0 ? Object.keys(e).length === 0 : itemsValid;
+
+    if (stepOk) {
       const newStep = Math.min(step + 1, STEPS.length - 1);
       setStep(newStep);
       void saveDraft(newStep); // autoguardado al avanzar
       window.scrollTo({ top: 0, behavior: "smooth" });
-    } else {
-      // Resalta automáticamente los campos faltantes/ inválidos.
+      return;
+    }
+    // Resalta automáticamente los campos faltantes/inválidos.
+    if (step === 0) {
       setTouched((prev) => {
         const t = { ...prev };
         for (const key in e) t[key] = true;
         return t;
       });
+    } else {
+      revealErrors();
     }
   }
 
@@ -300,13 +184,8 @@ export function ClientOnboardingForm({
       setStep(0);
       return;
     }
-    const oe = validateOrder();
-    if (Object.keys(oe).length > 0) {
-      setTouched((prev) => {
-        const t = { ...prev };
-        for (const key in oe) t[key] = true;
-        return t;
-      });
+    if (!itemsValid) {
+      revealErrors();
       setStep(1);
       return;
     }
@@ -316,7 +195,7 @@ export function ClientOnboardingForm({
       const res = await fetch("/api/cliente/registro", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ personal, order, finalize: true }),
+        body: JSON.stringify({ personal, order: { items }, finalize: true }),
       });
       const body = await res.json();
       setLoading(false);
@@ -334,15 +213,19 @@ export function ClientOnboardingForm({
 
   // Validación en vivo del paso actual.
   const personalErrors = validatePersonal();
-  const orderErrors = validateOrder();
-  const activeErrors: Errors =
-    step === 0 ? personalErrors : step === 1 ? orderErrors : {};
   // Solo mostramos el error de un campo si el usuario ya lo tocó.
   const errors: Errors = {};
-  for (const key in activeErrors) {
-    if (touched[key]) errors[key] = activeErrors[key];
+  if (step === 0) {
+    for (const key in personalErrors) {
+      if (touched[key]) errors[key] = personalErrors[key];
+    }
   }
-  const stepValid = Object.keys(activeErrors).length === 0;
+  const stepValid =
+    step === 0
+      ? Object.keys(personalErrors).length === 0
+      : step === 1
+        ? itemsValid
+        : true;
 
   return (
     <div className="rounded-3xl bg-white p-6 shadow-[0_10px_40px_rgba(20,150,166,0.10)] sm:p-10">
@@ -463,7 +346,7 @@ export function ClientOnboardingForm({
               onChange={(e) => setP("postalCode", e.target.value)}
               placeholder="Código postal"
               error={errors.postalCode}
-              optional
+              optional={!postalCodeRequired(personal.shippingCountry)}
             />
             <Field
               label="Dirección"
@@ -471,6 +354,22 @@ export function ClientOnboardingForm({
               onChange={(e) => setP("address", e.target.value)}
               placeholder="Dirección completa"
               error={errors.address}
+            />
+            <Field
+              label="Barrio"
+              value={personal.neighborhood}
+              onChange={(e) => setP("neighborhood", e.target.value)}
+              placeholder="Barrio"
+              error={errors.neighborhood}
+              optional
+            />
+            <Field
+              label="Especificaciones de la dirección"
+              value={personal.addressDetails}
+              onChange={(e) => setP("addressDetails", e.target.value)}
+              placeholder="Conjunto, torre, apto u otras indicaciones"
+              error={errors.addressDetails}
+              optional
             />
           </div>
 
@@ -495,41 +394,13 @@ export function ClientOnboardingForm({
         </div>
       ) : null}
 
-      {/* Paso 2: Orden de trabajo (campos dinámicos según el producto) */}
+      {/* Paso 2: Orden de trabajo (uno o varios productos) */}
       {step === 1 ? (
         <div className="space-y-5">
-          <SelectField
-            label="Selecciona el producto"
-            value={order.product}
-            onChange={(e) => selectProduct(e.target.value)}
-            error={errors.product}
-          >
-            <option value="">Selecciona...</option>
-            {PRODUCTS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </SelectField>
-
-          {order.product ? (
-            <>
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                {fieldsForProduct(order.product)
-                  .filter((k) => ORDER_FIELD_META[k].kind !== "engraving")
-                  .map(renderOrderField)}
-              </div>
-              <div className="space-y-5">
-                {fieldsForProduct(order.product)
-                  .filter((k) => ORDER_FIELD_META[k].kind === "engraving")
-                  .map(renderOrderField)}
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-edra-grey">
-              Selecciona un producto para ver los campos correspondientes.
-            </p>
-          )}
+          <p className="text-sm text-edra-grey">
+            Puedes pedir varios productos en una sola compra.
+          </p>
+          <OrderItemsEditor items={items} errors={itemErrors} {...handlers} />
         </div>
       ) : null}
 
@@ -555,18 +426,32 @@ export function ClientOnboardingForm({
             <SummaryRow label="Ciudad o estado" value={personal.cityState} />
             <SummaryRow label="Código postal" value={personal.postalCode || "—"} />
             <SummaryRow label="Dirección" value={personal.address} />
+            <SummaryRow label="Barrio" value={personal.neighborhood || "—"} />
+            <SummaryRow
+              label="Especificaciones de la dirección"
+              value={personal.addressDetails || "—"}
+            />
           </SummaryGroup>
 
-          <SummaryGroup title="Orden de trabajo">
-            <SummaryRow label="Producto" value={labelOf(PRODUCTS, order.product)} />
-            {fieldsForProduct(order.product).map((key) => (
-              <SummaryRow
-                key={key}
-                label={ORDER_FIELD_META[key].label}
-                value={orderFieldDisplay(key)}
-              />
-            ))}
-          </SummaryGroup>
+          {items.map((item, index) => (
+            <SummaryGroup
+              key={index}
+              title={
+                items.length > 1
+                  ? `Producto ${index + 1}: ${labelOf(PRODUCTS, item.product)}`
+                  : "Orden de trabajo"
+              }
+            >
+              <SummaryRow label="Producto" value={labelOf(PRODUCTS, item.product)} />
+              {fieldsForProduct(item.product).map((key) => (
+                <SummaryRow
+                  key={key}
+                  label={ORDER_FIELD_META[key].label}
+                  value={orderFieldDisplay(item, key)}
+                />
+              ))}
+            </SummaryGroup>
+          ))}
 
           {submitError ? <FormAlert type="error">{submitError}</FormAlert> : null}
         </div>

@@ -6,19 +6,24 @@ export function Pagination({
   totalPages,
   total,
   basePath,
-  q,
+  params = {},
+  itemLabel = { one: "orden", many: "órdenes" },
 }: {
   page: number;
   totalPages: number;
   total: number;
   basePath: string;
-  q: string;
+  /** Filtros activos que deben conservarse al cambiar de página. */
+  params?: Record<string, string | undefined>;
+  itemLabel?: { one: string; many: string };
 }) {
   function href(p: number) {
-    const params = new URLSearchParams();
-    if (q) params.set("q", q);
-    if (p > 1) params.set("page", String(p));
-    const qs = params.toString();
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value && value.trim()) search.set(key, value.trim());
+    }
+    if (p > 1) search.set("page", String(p));
+    const qs = search.toString();
     return qs ? `${basePath}?${qs}` : basePath;
   }
 
@@ -30,7 +35,7 @@ export function Pagination({
   return (
     <div className="flex items-center justify-between gap-4 text-sm text-edra-grey">
       <span>
-        {total} {total === 1 ? "orden" : "órdenes"} · Página {page} de{" "}
+        {total} {total === 1 ? itemLabel.one : itemLabel.many} · Página {page} de{" "}
         {totalPages}
       </span>
       <div className="flex items-center gap-2">

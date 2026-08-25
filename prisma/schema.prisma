@@ -98,8 +98,10 @@ model ClientProfile {
   // Envío
   shippingCountry String?
   cityState       String?
-  postalCode      String?
+  postalCode      String? // obligatorio solo si el país de envío no es Colombia
   address         String?
+  neighborhood    String? // barrio
+  addressDetails  String? // conjunto, torre, apto u otras indicaciones
 
   privacyAccepted Boolean @default(false)
 
@@ -130,10 +132,10 @@ enum Material {
   ORO_10K
   ORO_14K
   ORO_18K
-  ORO_22K
-  ORO_24K
+  ORO_18K_PLATA // Oro 18k + plata
   PLATA_925
   PLATA_950
+  PLATINO_950
 }
 
 enum GemType {
@@ -156,12 +158,15 @@ enum GemType {
   SIN_PIEDRA
 }
 
+// Estados del flujo de fabricación (en orden).
 enum OrderStatus {
-  PENDIENTE
-  EN_PROCESO
+  EN_TRAMITE
+  EN_FABRICACION
+  ENGASTE
+  NOVEDAD_FABRICACION
   FINALIZADO
   ENTREGADO
-  CANCELADO
+  DESISTIDO
 }
 
 enum DeliveryType {
@@ -180,22 +185,20 @@ enum PaymentMethod {
   EFECTIVO
 }
 
-// Paso 3: Orden de trabajo
-model Order {
-  id     String @id @default(cuid())
-  // Número visible para el cliente (consecutivo).
-  number Int    @unique @default(autoincrement())
+// Facturación electrónica: con FE o sin FE.
+enum InvoiceType {
+  CON_FE
+  SIN_FE
+}
 
-  // Cliente dueño de la orden
-  userId String
-  user   User   @relation("ClientOrders", fields: [userId], references: [id], onDelete: Cascade)
-
-  // Asesor asignado (lo asigna el módulo de asesores)
-  advisorId String?
-  advisor   User?   @relation("AdvisorOrders", fields: [advisorId], references: [id], onDelete: SetNull)
-
-  // Código de orden de trabajo asignado por el Asesor (Paso 4)
-  workOrderCode String?
+// Producto dentro de una orden. Una compra puede incluir varios productos:
+// los datos que dependen del producto (los del cliente y los técnicos del
+// asesor) viven aquí; los datos finales de la compra viven en `Order`.
+model OrderItem {
+  id       String @id @default(cuid())
+  orderId  String
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  position Int    @default(0) // orden de aparición dentro de la compra
 
   // Campos diligenciados por el Cliente (varían según el producto)
   product            Product? // nullable: borrador
@@ -204,6 +207,7 @@ model Order {
   sizeGentleman      String? // talla caballero
   material           Material?
   gemType            GemType?
+  gemOther           String? // gema escrita por el cliente (si gemType = OTRA)
   engraving          String? // grabado (máx. 25)
   engravingLady      String? // grabado argolla dama
   engravingGentleman String? // grabado argolla caballero
@@ -220,29 +224,62 @@ model Order {
   length             String? // largo (cadena/pulsera)
   productName        String? // nombre del producto (personalizado)
   productDescription String? // tipo de producto (personalizado)
-  manufacturingNotes String? // observaciones de fabricación
   gemNotes           String? // observación sobre las gemas
+  finalDescription   String? // descripción del producto (solo asesor)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+// Paso 3: Orden de trabajo (una compra, uno o varios productos)
+model Order {
+  id     String @id @default(cuid())
+  // Número visible para el cliente (consecutivo).
+  number Int    @unique @default(autoincrement())
+
+  // Cliente dueño de la orden
+  userId String
+  user   User   @relation("ClientOrders", fields: [userId], references: [id], onDelete: Cascade)
+
+  // Asesor asignado (lo asigna el módulo de asesores)
+  advisorId String?
+  advisor   User?   @relation("AdvisorOrders", fields: [advisorId], references: [id], onDelete: SetNull)
+
+  // Código de orden de trabajo asignado por el Asesor (Paso 4)
+  workOrderCode String?
+
+  // Productos de la compra (campos del cliente + técnicos del asesor)
+  items OrderItem[]
+
+  // Observaciones de fabricación: iguales para toda la compra
+  manufacturingNotes String?
 
   // Paso 4 — Datos finales (diligenciados por el Asesor). Valores en pesos (Int).
-  saleDate              DateTime? // fecha de venta
-  deliveryFrom          DateTime? // fecha de entrega/envío (desde)
-  deliveryTo            DateTime? // fecha de entrega/envío (hasta)
-  finalProductType      String? // tipo de producto
-  purchaseValue         Int? // valor compra
-  depositValue          Int? // valor abono
-  depositReceiptUrl     String? // comprobante de abono (enlace)
-  deliveryType          DeliveryType? // tipo de entrega
-  shippingValue         Int? // valor total del envío
-  balanceWithShipping   Int? // saldo con envío
-  finalDescription      String? // descripción del producto (solo asesor)
-  paymentMethod         PaymentMethod? // método de pago
-  jeweler               String? // joyero fabricante
-  jewelerDeliveryDate   DateTime? // fecha de entrega del joyero
-  systemEntry           String? // ingreso al sistema
-  estimatedDeliveryDate DateTime? // fecha estimada de entrega (hasta)
-  internalNotes         String? // notas adicionales (uso interno)
+  saleDate            DateTime? // fecha de venta
+  jewelerDeliveryDate DateTime? // fecha de entrega del joyero
+  deliveryFrom        DateTime? // fecha de entrega/envío (desde)
+  deliveryTo          DateTime? // fecha de entrega/envío (hasta)
+  purchaseValue       Int? // valor compra
+  depositValue        Int? // valor abono
+  deliveryType        DeliveryType? // tipo de entrega
+  shippingValue       Int? // valor envío
+  balanceWithShipping Int? // saldo con envío = compra - abono + envío (calculado)
+  paymentMethod       PaymentMethod? // método de pago
+  invoiceType         InvoiceType? // con FE / sin FE
+  jeweler             String? // joyero fabricante
+  systemEntry         String? // ingreso al sistema
+  internalNotes       String? // notas adicionales (uso interno)
 
-  status OrderStatus @default(PENDIENTE)
+  // Comprobante de abono (archivo adjunto guardado en la BD)
+  depositReceiptName String? // nombre original del archivo
+  depositReceiptType String? // MIME type
+  depositReceiptSize Int? // tamaño en bytes
+  depositReceiptData Bytes? // contenido del archivo
+
+  status OrderStatus @default(EN_TRAMITE)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

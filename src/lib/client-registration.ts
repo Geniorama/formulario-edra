@@ -7,6 +7,7 @@ import {
   MATERIALS,
   GEM_TYPES,
 } from "@/lib/form-options";
+import { MAX_ORDER_ITEMS } from "@/lib/validations";
 import type {
   DocumentType,
   ContactMedium,
@@ -41,24 +42,39 @@ export function sanitizePersonal(raw: Record<string, unknown> = {}) {
     cityState: str(raw.cityState),
     postalCode: str(raw.postalCode),
     address: str(raw.address),
+    neighborhood: str(raw.neighborhood),
+    addressDetails: str(raw.addressDetails),
     privacyAccepted: Boolean(raw.privacyAccepted),
   };
 }
 
-/** Limpia la orden de trabajo para guardarla (acepta parciales). */
-export function sanitizeOrder(raw: Record<string, unknown> = {}) {
+/** Limpia un producto de la compra para guardarlo (acepta parciales). */
+export function sanitizeOrderItem(raw: Record<string, unknown> = {}) {
+  const gemType = inSet(GEM_TYPES, raw.gemType) as GemType | null;
   return {
     product: inSet(PRODUCTS, raw.product) as Product | null,
     size: str(raw.size),
     sizeLady: str(raw.sizeLady),
     sizeGentleman: str(raw.sizeGentleman),
     material: inSet(MATERIALS, raw.material) as Material | null,
-    gemType: inSet(GEM_TYPES, raw.gemType) as GemType | null,
+    gemType,
+    // Solo tiene sentido guardar la gema escrita si eligió "Otra".
+    gemOther: gemType === "OTRA" ? str(raw.gemOther) : null,
     engraving: str(raw.engraving),
     engravingLady: str(raw.engravingLady),
     engravingGentleman: str(raw.engravingGentleman),
     fontType: str(raw.fontType),
   };
+}
+
+/** Limpia la lista de productos de una compra (máximo `MAX_ORDER_ITEMS`). */
+export function sanitizeOrderItems(raw: unknown): ReturnType<
+  typeof sanitizeOrderItem
+>[] {
+  const list = Array.isArray(raw) ? raw : [];
+  return list
+    .slice(0, MAX_ORDER_ITEMS)
+    .map((item) => sanitizeOrderItem((item ?? {}) as Record<string, unknown>));
 }
 
 /**
@@ -72,7 +88,7 @@ export async function persistRegistration(
   opts: { lastStep?: number; completed?: boolean } = {}
 ) {
   const personal = sanitizePersonal(personalRaw);
-  const order = sanitizeOrder(orderRaw);
+  const items = sanitizeOrderItems(orderRaw.items);
 
   await prisma.clientProfile.upsert({
     where: { userId },
@@ -89,11 +105,23 @@ export async function persistRegistration(
     },
   });
 
-  // Una sola orden durante el registro: actualizar la existente o crearla.
-  const existingOrder = await prisma.order.findFirst({ where: { userId } });
-  if (existingOrder) {
-    await prisma.order.update({ where: { id: existingOrder.id }, data: order });
-  } else {
-    await prisma.order.create({ data: { userId, ...order } });
-  }
+  // Una sola orden durante el registro: se reescriben sus productos.
+  const existingOrder = await prisma.order.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+
+  const orderId =
+    existingOrder?.id ??
+    (await prisma.order.create({ data: { userId }, select: { id: true } })).id;
+
+  await prisma.$transaction([
+    prisma.orderItem.deleteMany({ where: { orderId } }),
+    prisma.orderItem.createMany({
+      data: items.map((item, position) => ({ ...item, orderId, position })),
+    }),
+  ]);
+
+  return orderId;
 }
