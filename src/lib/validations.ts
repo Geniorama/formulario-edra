@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { postalCodeRequired } from "@/lib/form-options";
+import {
+  postalCodeRequired,
+  materialColorOptionsFor,
+} from "@/lib/form-options";
+import { fieldsForItem, ORDER_FIELD_META } from "@/lib/product-fields";
 
 export const registerSchema = z
   .object({
@@ -111,6 +115,7 @@ export const materialEnum = z.enum([
   "PLATA_925",
   "PLATA_950",
   "PLATINO_950",
+  "PLATINO_950_ORO_18K",
 ]);
 export const orderStatusEnum = z.enum([
   "EN_TRAMITE",
@@ -129,12 +134,13 @@ export const deliveryTypeEnum = z.enum([
   "RECOGER_EN_TIENDA",
 ]);
 
-// Medios de pago. Los tres primeros son heredados (ya no se ofrecen en la UI,
-// pero siguen siendo válidos para las órdenes antiguas).
+// Medios de pago. Los cuatro primeros son heredados (ya no se ofrecen en la
+// UI, pero siguen siendo válidos para las órdenes antiguas).
 export const paymentMethodEnum = z.enum([
   "TARJETA_CREDITO",
   "TARJETA_DEBITO",
   "TRANSFERENCIA",
+  "FREDDY",
   // Con FE
   "EFECTIVO",
   "ADDI",
@@ -154,7 +160,6 @@ export const paymentMethodEnum = z.enum([
   "SUSA",
   "LUZ",
   "JIMMY",
-  "FREDDY",
   "DON_FREDDY",
   "OTRO",
 ]);
@@ -181,6 +186,18 @@ export const gemEnum = z.enum([
   "SIN_PIEDRA",
 ]);
 
+// Fecha de un input date ("YYYY-MM-DD") que no esté en el futuro.
+const birthDateField = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Ingresa una fecha válida")
+  .refine((v) => {
+    const d = new Date(`${v}T00:00:00.000Z`);
+    return !isNaN(d.getTime()) && d.getTime() <= Date.now();
+  }, "Ingresa una fecha válida")
+  .optional()
+  .or(z.literal(""));
+
 const personalBase = z.object({
   documentType: documentTypeEnum,
   documentNumber: z
@@ -202,6 +219,7 @@ const personalBase = z.object({
   address: z.string().trim().min(3, "Ingresa la dirección de envío"),
   neighborhood: z.string().trim().max(80).optional().or(z.literal("")),
   addressDetails: z.string().trim().max(200).optional().or(z.literal("")),
+  birthDate: birthDateField,
   privacyAccepted: z.boolean(),
 });
 
@@ -239,12 +257,10 @@ export const personalDataSchema = personalBase.superRefine((data, ctx) => {
   }
 });
 
-const engravingField = z
-  .string()
-  .trim()
-  .max(25, "Máximo 25 caracteres")
-  .optional()
-  .or(z.literal(""));
+// Los grabados no tienen límite de caracteres para el cliente (solo una
+// sugerencia de legibilidad); el tope es un resguardo contra envíos abusivos.
+const engravingField = z.string().trim().max(1000).optional().or(z.literal(""));
+const optionalText = z.string().trim().max(80).optional().or(z.literal(""));
 
 // Un producto dentro de la compra.
 export const orderItemSchema = z
@@ -254,14 +270,34 @@ export const orderItemSchema = z
     sizeLady: z.string().optional().or(z.literal("")),
     sizeGentleman: z.string().optional().or(z.literal("")),
     material: materialEnum,
+    materialColor: optionalText,
+    materialColorLady: optionalText,
+    materialColorGentleman: optionalText,
+    materialColorRing: optionalText,
     gemType: gemEnum.optional().or(z.literal("")),
     gemOther: z.string().trim().max(80).optional().or(z.literal("")),
     engraving: engravingField,
     engravingLady: engravingField,
     engravingGentleman: engravingField,
-    fontType: z.string().optional().or(z.literal("")),
+    engravingRing: engravingField,
+    fontType: optionalText,
+    fontTypeRing: optionalText,
+    symbol: optionalText,
+    symbolRing: optionalText,
   })
   .superRefine((data, ctx) => {
+    // El color es obligatorio cuando el material lo lleva (la plata no).
+    const colors = materialColorOptionsFor(data.material).map((o) => o.value);
+    for (const key of fieldsForItem(data)) {
+      const meta = ORDER_FIELD_META[key];
+      if (meta.kind === "color" && !colors.includes(data[key] ?? "")) {
+        ctx.addIssue({
+          path: [key],
+          code: "custom",
+          message: `Selecciona ${meta.label.toLowerCase()}`,
+        });
+      }
+    }
     // Si eligió "Otra" gema, debe escribir cuál.
     if (data.gemType === "OTRA" && !data.gemOther) {
       ctx.addIssue({
@@ -288,7 +324,41 @@ export const clientOnboardingSchema = z.object({
   order: workOrderSchema,
 });
 
+// Edición de los datos del cliente desde la orden (solo ADMIN). Es permisiva:
+// el perfil puede estar a medio diligenciar y el admin solo corrige datos.
+const adminText = (max: number) =>
+  z.string().trim().max(max).optional().or(z.literal(""));
+
+export const adminClientDataSchema = z.object({
+  firstName: z
+    .string()
+    .trim()
+    .min(2, "Escribe los nombres")
+    .max(60, "El nombre es demasiado largo"),
+  lastName: z
+    .string()
+    .trim()
+    .min(2, "Escribe los apellidos")
+    .max(60, "El apellido es demasiado largo"),
+  documentType: documentTypeEnum.optional().or(z.literal("")),
+  documentNumber: adminText(30),
+  whatsapp: z
+    .string()
+    .trim()
+    .regex(/^\+[1-9]\d{6,14}$/, "Ingresa un número de WhatsApp válido")
+    .optional()
+    .or(z.literal("")),
+  birthDate: birthDateField,
+  shippingCountry: adminText(60),
+  cityState: adminText(120),
+  postalCode: adminText(20),
+  address: adminText(200),
+  neighborhood: adminText(80),
+  addressDetails: adminText(200),
+});
+
 export type PersonalDataInput = z.infer<typeof personalBase>;
+export type AdminClientDataInput = z.infer<typeof adminClientDataSchema>;
 export type OrderItemInput = z.infer<typeof orderItemSchema>;
 export type WorkOrderInput = z.infer<typeof workOrderSchema>;
 

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { workOrderSchema } from "@/lib/validations";
 import { sanitizeOrderItems } from "@/lib/client-registration";
 import { notifyStaffNewOrder } from "@/lib/notifications";
+import { formatOrderNumber } from "@/lib/order-display";
 
 // Crea una nueva orden de trabajo para el cliente autenticado.
 export async function POST(request: Request) {
@@ -59,7 +60,12 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json(
-    { ok: true, id: order.id, message: "Orden creada." },
+    {
+      ok: true,
+      id: order.id,
+      number: formatOrderNumber(order.number),
+      message: "Orden creada.",
+    },
     { status: 201 }
   );
 }

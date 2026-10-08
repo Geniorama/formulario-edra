@@ -103,6 +103,8 @@ model ClientProfile {
   neighborhood    String? // barrio
   addressDetails  String? // conjunto, torre, apto u otras indicaciones
 
+  birthDate DateTime? // fecha de cumpleaños (opcional)
+
   privacyAccepted Boolean @default(false)
 
   // Estado del registro por pasos
@@ -136,6 +138,7 @@ enum Material {
   PLATA_925
   PLATA_950
   PLATINO_950
+  PLATINO_950_ORO_18K // Platino 950 + Oro 18k
 }
 
 enum GemType {
@@ -179,8 +182,8 @@ enum DeliveryType {
 // Medios de pago. La lista que se ofrece depende de `InvoiceType`:
 // Con FE → EFECTIVO..DATAFONO_EDUARDO; Sin FE → WESTERN_WEENDY..OTRO.
 // Las etiquetas y la separación viven en `src/lib/order-display.ts`.
-// TARJETA_CREDITO / TARJETA_DEBITO / TRANSFERENCIA ya no se ofrecen: se
-// conservan para no romper las órdenes antiguas que las usan.
+// TARJETA_CREDITO / TARJETA_DEBITO / TRANSFERENCIA / FREDDY ya no se ofrecen:
+// se conservan para no romper las órdenes antiguas que las usan.
 enum PaymentMethod {
   TARJETA_CREDITO
   TARJETA_DEBITO
@@ -228,12 +231,22 @@ model OrderItem {
   sizeLady           String? // talla dama
   sizeGentleman      String? // talla caballero
   material           Material?
+  // Color del material (no aplica a la plata). Valores y etiquetas en
+  // `materialColorOptionsFor` (src/lib/form-options.ts).
+  materialColor          String? // productos de una sola pieza
+  materialColorLady      String? // argolla dama
+  materialColorGentleman String? // argolla caballero
+  materialColorRing      String? // anillo de compromiso (set matrimonial)
   gemType            GemType?
   gemOther           String? // gema escrita por el cliente (si gemType = OTRA)
-  engraving          String? // grabado (máx. 25)
+  engraving          String? // grabado (cintillo)
   engravingLady      String? // grabado argolla dama
   engravingGentleman String? // grabado argolla caballero
+  engravingRing      String? // grabado anillo de compromiso (set matrimonial)
   fontType           String? // tipo de fuente
+  fontTypeRing       String? // fuente del anillo de compromiso (set matrimonial)
+  symbol             String? // símbolo del grabado ("01".."39")
+  symbolRing         String? // símbolo del anillo de compromiso (set matrimonial)
 
   // Campos diligenciados por el Asesor (varían según el producto)
   weightApprox       String? // peso aprox. (cadena)

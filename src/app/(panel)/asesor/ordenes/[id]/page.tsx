@@ -3,14 +3,8 @@ import { redirect, notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import {
-  DOCUMENT_TYPES,
-  CONTACT_MEDIUMS,
-  SOCIAL_NETWORKS,
-  labelOf,
-} from "@/lib/form-options";
 import { ADVISOR_ITEM_KEYS } from "@/lib/product-fields";
-import type { OrderItemState } from "@/lib/order-utils";
+import { toOrderItemState } from "@/lib/order-utils";
 import {
   ORDER_STATUS_LABELS,
   ORDER_STATUS_STYLES,
@@ -22,6 +16,8 @@ import {
   AdvisorOrderForm,
   type AdvisorItemState,
 } from "@/components/forms/order/advisor-order-form";
+import { OrderPdfLink } from "@/components/forms/order/order-done";
+import { ClientDataCard } from "@/components/admin/client-data-card";
 
 const s = (v?: string | null) => v ?? "";
 
@@ -59,19 +55,7 @@ export default async function AsesorOrdenDetallePage({
     }
     return {
       id: item.id,
-      client: {
-        product: s(item.product),
-        size: s(item.size),
-        sizeLady: s(item.sizeLady),
-        sizeGentleman: s(item.sizeGentleman),
-        material: s(item.material),
-        gemType: s(item.gemType),
-        gemOther: s(item.gemOther),
-        engraving: s(item.engraving),
-        engravingLady: s(item.engravingLady),
-        engravingGentleman: s(item.engravingGentleman),
-        fontType: s(item.fontType),
-      } satisfies OrderItemState,
+      client: toOrderItemState(item),
       fields,
     };
   });
@@ -128,46 +112,34 @@ export default async function AsesorOrdenDetallePage({
             {ORDER_STATUS_LABELS[order.status]}
           </span>
         </div>
+        <div className="mt-4">
+          <OrderPdfLink orderId={order.id} variant="outline" />
+        </div>
       </div>
 
-      {/* Datos del cliente */}
-      <div className="rounded-3xl bg-white p-6 shadow-[0_10px_40px_rgba(20,150,166,0.10)] sm:p-8">
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-edra-grey">
-          Cliente
-        </h2>
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
-          <Row label="Nombre" value={`${user.firstName} ${user.lastName}`} />
-          <Row label="Correo" value={user.email} />
-          {profile ? (
-            <>
-              <Row
-                label="Documento"
-                value={`${labelOf(DOCUMENT_TYPES, profile.documentType)} ${profile.documentNumber ?? ""}`}
-              />
-              <Row label="WhatsApp" value={profile.whatsapp ?? "—"} />
-              <Row
-                label="Medio de contacto"
-                value={labelOf(CONTACT_MEDIUMS, profile.contactMedium)}
-              />
-              {profile.contactMedium === "RED_SOCIAL" ? (
-                <Row
-                  label={labelOf(SOCIAL_NETWORKS, profile.socialNetwork)}
-                  value={profile.socialLink ?? "—"}
-                />
-              ) : null}
-              <Row label="País de envío" value={profile.shippingCountry ?? "—"} />
-              <Row label="Ciudad o estado" value={profile.cityState ?? "—"} />
-              <Row label="Código postal" value={profile.postalCode ?? "—"} />
-              <Row label="Dirección" value={profile.address ?? "—"} />
-              <Row label="Barrio" value={profile.neighborhood ?? "—"} />
-              <Row
-                label="Especificaciones de la dirección"
-                value={profile.addressDetails ?? "—"}
-              />
-            </>
-          ) : null}
-        </dl>
-      </div>
+      {/* Datos del cliente (el ADMIN puede editarlos) */}
+      <ClientDataCard
+        userId={user.id}
+        canEdit={isAdmin}
+        email={user.email}
+        contactMedium={profile?.contactMedium ?? ""}
+        socialNetwork={profile?.socialNetwork ?? ""}
+        socialLink={profile?.socialLink ?? ""}
+        initial={{
+          firstName: user.firstName,
+          lastName: user.lastName,
+          documentType: s(profile?.documentType),
+          documentNumber: s(profile?.documentNumber),
+          whatsapp: s(profile?.whatsapp),
+          birthDate: toDateInput(profile?.birthDate),
+          shippingCountry: s(profile?.shippingCountry),
+          cityState: s(profile?.cityState),
+          postalCode: s(profile?.postalCode),
+          address: s(profile?.address),
+          neighborhood: s(profile?.neighborhood),
+          addressDetails: s(profile?.addressDetails),
+        }}
+      />
 
       {/* Formulario del asesor (la solicitud del cliente va dentro, por producto) */}
       <div className="rounded-3xl bg-white p-6 shadow-[0_10px_40px_rgba(20,150,166,0.10)] sm:p-8">
@@ -176,6 +148,7 @@ export default async function AsesorOrdenDetallePage({
         </h2>
         <AdvisorOrderForm
           orderId={order.id}
+          orderNumber={formatOrderNumber(order.number)}
           canEditClient={isAdmin}
           advisors={advisors}
           initial={{
@@ -194,15 +167,6 @@ export default async function AsesorOrdenDetallePage({
           }}
         />
       </div>
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-4 border-b border-black/5 py-1.5 text-sm last:border-0">
-      <dt className="text-edra-grey">{label}</dt>
-      <dd className="text-right font-medium text-edra-ink">{value}</dd>
     </div>
   );
 }

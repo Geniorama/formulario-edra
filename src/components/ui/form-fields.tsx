@@ -8,7 +8,7 @@ const baseInput =
   "w-full rounded-full border border-edra-grey/30 bg-white px-5 py-3 text-sm text-edra-ink placeholder:text-edra-grey/60 transition-colors focus:border-edra focus:outline-none";
 
 // Etiqueta con indicador: * para obligatorios, "(opcional)" para los demás.
-function FieldLabel({
+export function FieldLabel({
   htmlFor,
   label,
   optional,
@@ -203,6 +203,7 @@ export function SelectField({
   label,
   error,
   optional,
+  highlight,
   className = "",
   children,
   ...props
@@ -210,6 +211,8 @@ export function SelectField({
   label: string;
   error?: string;
   optional?: boolean;
+  /** Resalta el campo con el tono de la marca (dato relevante). */
+  highlight?: boolean;
 }) {
   return (
     <div className={className}>
@@ -217,8 +220,10 @@ export function SelectField({
       <select
         id={props.id ?? props.name}
         className={`${baseInput} appearance-none bg-[length:1rem] bg-[right_1.25rem_center] bg-no-repeat pr-10 ${
-          error ? "border-red-400 focus:border-red-400" : ""
-        }`}
+          highlight
+            ? "border-edra bg-edra-soft font-semibold text-edra-dark ring-2 ring-edra/30"
+            : ""
+        } ${error ? "border-red-400 focus:border-red-400" : ""}`}
         style={{
           backgroundImage:
             "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236e6f71'><path fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/></svg>\")",

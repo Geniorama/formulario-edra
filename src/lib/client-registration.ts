@@ -6,7 +6,9 @@ import {
   PRODUCTS,
   MATERIALS,
   GEM_TYPES,
+  materialColorOptionsFor,
 } from "@/lib/form-options";
+import { fieldsForProduct, type OrderFieldKey } from "@/lib/product-fields";
 import { MAX_ORDER_ITEMS } from "@/lib/validations";
 import type {
   DocumentType,
@@ -23,6 +25,13 @@ function str(v: unknown): string | null {
 
 function inSet(options: readonly { value: string }[], v: unknown): string | null {
   return typeof v === "string" && options.some((o) => o.value === v) ? v : null;
+}
+
+/** Fecha de un input date ("YYYY-MM-DD") a medianoche UTC, o null. */
+export function parseBirthDate(v: unknown): Date | null {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v.trim())) return null;
+  const d = new Date(`${v.trim()}T00:00:00.000Z`);
+  return isNaN(d.getTime()) || d.getTime() > Date.now() ? null : d;
 }
 
 /** Limpia los datos personales para guardarlos (acepta parciales). */
@@ -44,6 +53,7 @@ export function sanitizePersonal(raw: Record<string, unknown> = {}) {
     address: str(raw.address),
     neighborhood: str(raw.neighborhood),
     addressDetails: str(raw.addressDetails),
+    birthDate: parseBirthDate(raw.birthDate),
     privacyAccepted: Boolean(raw.privacyAccepted),
   };
 }
@@ -51,19 +61,34 @@ export function sanitizePersonal(raw: Record<string, unknown> = {}) {
 /** Limpia un producto de la compra para guardarlo (acepta parciales). */
 export function sanitizeOrderItem(raw: Record<string, unknown> = {}) {
   const gemType = inSet(GEM_TYPES, raw.gemType) as GemType | null;
+  const product = inSet(PRODUCTS, raw.product) as Product | null;
+  const material = inSet(MATERIALS, raw.material) as Material | null;
+  // El color solo se guarda si aplica al producto y al material elegidos.
+  const fields = fieldsForProduct(product ?? undefined);
+  const colors = materialColorOptionsFor(material);
+  const color = (key: OrderFieldKey) =>
+    fields.includes(key) ? inSet(colors, raw[key]) : null;
   return {
-    product: inSet(PRODUCTS, raw.product) as Product | null,
+    product,
     size: str(raw.size),
     sizeLady: str(raw.sizeLady),
     sizeGentleman: str(raw.sizeGentleman),
-    material: inSet(MATERIALS, raw.material) as Material | null,
+    material,
+    materialColor: color("materialColor"),
+    materialColorLady: color("materialColorLady"),
+    materialColorGentleman: color("materialColorGentleman"),
+    materialColorRing: color("materialColorRing"),
     gemType,
     // Solo tiene sentido guardar la gema escrita si eligió "Otra".
     gemOther: gemType === "OTRA" ? str(raw.gemOther) : null,
     engraving: str(raw.engraving),
     engravingLady: str(raw.engravingLady),
     engravingGentleman: str(raw.engravingGentleman),
+    engravingRing: str(raw.engravingRing),
     fontType: str(raw.fontType),
+    fontTypeRing: str(raw.fontTypeRing),
+    symbol: str(raw.symbol),
+    symbolRing: str(raw.symbolRing),
   };
 }
 

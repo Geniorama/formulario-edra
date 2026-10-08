@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Plus, Trash2 } from "lucide-react";
 import {
   Field,
@@ -14,10 +15,11 @@ import {
 } from "@/components/ui/form-fields";
 import { Stepper } from "@/components/forms/onboarding/stepper";
 import { OrderItemFields } from "@/components/forms/order/order-fields";
+import { OrderDone } from "@/components/forms/order/order-done";
 import {
   advisorFieldsForProduct,
   ADVISOR_FIELD_META,
-  fieldsForProduct,
+  fieldsForItem,
   ORDER_FIELD_META,
   type AdvisorFieldKey,
   type OrderFieldKey,
@@ -25,6 +27,7 @@ import {
 import {
   emptyOrderItem,
   orderFieldDisplay,
+  withOrderField,
   type OrderItemState,
 } from "@/lib/order-utils";
 import { PRODUCTS, labelOf } from "@/lib/form-options";
@@ -71,11 +74,14 @@ export type AdvisorItemState = {
 
 export function AdvisorOrderForm({
   orderId,
+  orderNumber,
   canEditClient = false,
   advisors = [],
   initial,
 }: {
   orderId: string;
+  /** Número visible de la orden, p. ej. "EDRA-00042". */
+  orderNumber: string;
   /** El ADMIN puede editar también la solicitud del cliente y el asesor. */
   canEditClient?: boolean;
   advisors?: AdvisorOption[];
@@ -105,6 +111,8 @@ export function AdvisorOrderForm({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Pantalla de finalización tras "Completar".
+  const [done, setDone] = useState(false);
 
   // Medios de pago: la lista depende de la facturación electrónica elegida.
   const paymentOptions = paymentMethodOptionsFor(final.invoiceType);
@@ -133,7 +141,9 @@ export function AdvisorOrderForm({
   function setClientField(index: number, key: OrderFieldKey, value: string) {
     setItems((prev) =>
       prev.map((item, i) =>
-        i === index ? { ...item, client: { ...item.client, [key]: value } } : item
+        i === index
+          ? { ...item, client: withOrderField(item.client, key, value) }
+          : item
       )
     );
   }
@@ -298,10 +308,38 @@ export function AdvisorOrderForm({
 
   async function finish() {
     if (await persist()) {
-      setMessage("La orden se guardó con éxito.");
+      setDone(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
       router.refresh();
     }
+  }
+
+  if (done) {
+    return (
+      <OrderDone
+        title="La orden se guardó con éxito"
+        description="Todos los datos quedaron registrados. Puedes descargar la orden en PDF o seguir editándola."
+        orderId={orderId}
+        orderNumber={orderNumber}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            setMessage(null);
+            setDone(false);
+          }}
+          className="rounded-full border border-edra-grey/30 px-6 py-3 text-sm font-medium text-edra-grey transition-colors hover:border-edra hover:text-edra"
+        >
+          Seguir editando
+        </button>
+        <Link
+          href="/asesor/ordenes"
+          className="rounded-full border border-edra-grey/30 px-6 py-3 text-sm font-medium text-edra-grey transition-colors hover:border-edra hover:text-edra"
+        >
+          Volver a órdenes
+        </Link>
+      </OrderDone>
+    );
   }
 
   return (
@@ -445,10 +483,12 @@ export function AdvisorOrderForm({
                 </option>
               ))}
             </SelectField>
+            {/* Con FE es un dato clave para el asesor: se resalta. */}
             <SelectField
               label="Facturación electrónica"
               value={final.invoiceType ?? ""}
               onChange={(e) => setInvoiceType(e.target.value)}
+              highlight={final.invoiceType === "CON_FE"}
               optional
             >
               <option value="">Selecciona...</option>
@@ -611,7 +651,7 @@ function ItemCard({
         </div>
       ) : (
         <dl className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
-          {fieldsForProduct(product).map((key) => (
+          {fieldsForItem(item.client).map((key) => (
             <div
               key={key}
               className="flex justify-between gap-4 border-b border-black/5 py-1 text-sm last:border-0"

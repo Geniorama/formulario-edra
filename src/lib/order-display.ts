@@ -51,13 +51,12 @@ export const PAYMENT_METHODS_SIN_FE: PaymentOption[] = [
   { value: "SISTECREDITO", label: "Sistecredito" },
   { value: "NEQUI_SANTIAGO", label: "Nequi Santiago" },
   { value: "NEQUI_DON_MAURO", label: "Nequi Don Mauro" },
-  { value: "ESTABAN_CLAUDIA_JM", label: "Estaban/Claudia JM" },
+  { value: "ESTABAN_CLAUDIA_JM", label: "Esteban/Claudia JM" },
   { value: "HECTOR_NARANJO", label: "Hector Naranjo" },
   { value: "DAVIVIENDA_ERIKA", label: "Davivienda Erika" },
   { value: "SUSA", label: "Susa" },
   { value: "LUZ", label: "Luz" },
   { value: "JIMMY", label: "Jimmy" },
-  { value: "FREDDY", label: "Freddy" },
   { value: "DON_FREDDY", label: "Don Freddy" },
   { value: "OTRO", label: "Otro" },
 ];
@@ -70,6 +69,7 @@ const LEGACY_PAYMENT_METHODS: PaymentOption[] = [
   { value: "TARJETA_CREDITO", label: "Tarjeta crédito" },
   { value: "TARJETA_DEBITO", label: "Tarjeta débito" },
   { value: "TRANSFERENCIA", label: "Transferencia" },
+  { value: "FREDDY", label: "Freddy" },
 ];
 
 /** Todas las etiquetas conocidas (para mostrar, no para los selectores). */
@@ -139,6 +139,12 @@ export function formatMoney(n?: number | null): string {
 export function formatDate(d?: Date | null): string {
   if (!d) return "—";
   return d.toLocaleDateString("es-CO");
+}
+
+/** Fecha de cumpleaños (guardada a medianoche UTC) como "DD/MM/AAAA". */
+export function formatBirthDate(d?: Date | null): string {
+  if (!d) return "—";
+  return toDateInput(d).split("-").reverse().join("/");
 }
 
 /** Convierte una fecha a "YYYY-MM-DD" para inputs date (o ""). */

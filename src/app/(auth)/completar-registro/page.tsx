@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ClientOnboardingForm } from "@/components/forms/onboarding/client-onboarding-form";
+import { toOrderItemState } from "@/lib/order-utils";
+import { toDateInput } from "@/lib/order-display";
 
 // Convierte null/undefined en "" para precargar el formulario.
 const s = (v?: string | null) => v ?? "";
@@ -35,22 +37,11 @@ export default async function CompletarRegistroPage() {
     address: s(profile?.address),
     neighborhood: s(profile?.neighborhood),
     addressDetails: s(profile?.addressDetails),
+    birthDate: toDateInput(profile?.birthDate),
     privacyAccepted: profile?.privacyAccepted ?? false,
   };
 
-  const initialItems = (order?.items ?? []).map((item) => ({
-    product: s(item.product),
-    size: s(item.size),
-    sizeLady: s(item.sizeLady),
-    sizeGentleman: s(item.sizeGentleman),
-    material: s(item.material),
-    gemType: s(item.gemType),
-    gemOther: s(item.gemOther),
-    engraving: s(item.engraving),
-    engravingLady: s(item.engravingLady),
-    engravingGentleman: s(item.engravingGentleman),
-    fontType: s(item.fontType),
-  }));
+  const initialItems = (order?.items ?? []).map(toOrderItemState);
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-10">

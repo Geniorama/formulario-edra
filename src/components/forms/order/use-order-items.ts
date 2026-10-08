@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   emptyOrderItem,
+  withOrderField,
   validateOrderItems,
   hasErrors,
   type OrderItemState,
@@ -28,7 +29,9 @@ export function useOrderItems(initial?: OrderItemState[]) {
 
   function setField(index: number, key: OrderFieldKey, value: string) {
     setItems((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, [key]: value } : item))
+      prev.map((item, i) =>
+        i === index ? withOrderField(item, key, value) : item
+      )
     );
     markTouched(index, key);
   }

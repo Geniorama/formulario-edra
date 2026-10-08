@@ -15,6 +15,7 @@
     "db:migrate-ajustes": "tsx prisma/migrate-ajustes.ts",
     "db:migrate-multiproducto": "tsx prisma/migrate-multiproducto.ts",
     "db:migrate-medios-pago": "tsx prisma/migrate-medios-pago.ts",
+    "db:migrate-don-freddy": "tsx prisma/migrate-don-freddy.ts",
     "test:correo": "tsx scripts/test-correo.ts",
     "db:studio": "prisma studio"
   },
@@ -25,6 +26,7 @@
     "lucide-react": "^1.21.0",
     "next": "16.2.9",
     "next-auth": "^5.0.0-beta.31",
+    "pdf-lib": "^1.17.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-phone-number-input": "^3.4.17",

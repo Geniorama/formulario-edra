@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { clientOnboardingSchema } from "@/lib/validations";
 import { persistRegistration } from "@/lib/client-registration";
 import { notifyStaffNewOrder } from "@/lib/notifications";
+import { formatOrderNumber } from "@/lib/order-display";
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -61,15 +62,16 @@ export async function POST(request: Request) {
       { completed: true, lastStep: 2 }
     );
 
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        number: true,
+        items: { select: { product: true }, orderBy: { position: "asc" } },
+      },
+    });
+
     try {
-      const order = await prisma.order.findUnique({
-        where: { id: orderId },
-        select: {
-          id: true,
-          number: true,
-          items: { select: { product: true }, orderBy: { position: "asc" } },
-        },
-      });
       if (order) {
         await notifyStaffNewOrder({
           orderId: order.id,
@@ -82,8 +84,14 @@ export async function POST(request: Request) {
       console.error("Error notificando nueva orden:", e);
     }
 
+    // El formulario usa la orden para la pantalla final (descarga en PDF).
     return NextResponse.json(
-      { ok: true, message: "Registro completado." },
+      {
+        ok: true,
+        message: "Registro completado.",
+        orderId,
+        orderNumber: order ? formatOrderNumber(order.number) : null,
+      },
       { status: 201 }
     );
   }

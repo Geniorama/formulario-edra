@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import {
@@ -14,6 +13,7 @@ import {
 } from "@/components/ui/form-fields";
 import { Stepper } from "./stepper";
 import { OrderItemsEditor } from "@/components/forms/order/order-fields";
+import { OrderDone } from "@/components/forms/order/order-done";
 import { useOrderItems } from "@/components/forms/order/use-order-items";
 import {
   DOCUMENT_TYPES,
@@ -24,7 +24,7 @@ import {
   postalCodeRequired,
   labelOf,
 } from "@/lib/form-options";
-import { fieldsForProduct, ORDER_FIELD_META } from "@/lib/product-fields";
+import { fieldsForItem, ORDER_FIELD_META } from "@/lib/product-fields";
 import { orderFieldDisplay, type OrderItemState } from "@/lib/order-utils";
 
 const STEPS = ["Datos personales", "Orden de trabajo", "Confirmación"];
@@ -42,6 +42,8 @@ type Personal = {
   address: string;
   neighborhood: string;
   addressDetails: string;
+  /** Fecha de cumpleaños ("YYYY-MM-DD"), opcional. */
+  birthDate: string;
   privacyAccepted: boolean;
 };
 
@@ -58,6 +60,7 @@ const emptyPersonal: Personal = {
   address: "",
   neighborhood: "",
   addressDetails: "",
+  birthDate: "",
   privacyAccepted: false,
 };
 
@@ -72,7 +75,6 @@ export function ClientOnboardingForm({
   initialItems?: OrderItemState[];
   initialStep?: number;
 } = {}) {
-  const router = useRouter();
   const [step, setStep] = useState(Math.min(Math.max(initialStep, 0), 2));
   const [personal, setPersonal] = useState<Personal>(
     initialPersonal ?? emptyPersonal
@@ -90,6 +92,10 @@ export function ClientOnboardingForm({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  // Orden creada al finalizar: muestra la pantalla de finalización.
+  const [done, setDone] = useState<{ id: string; number: string } | null>(null);
+  // Tope del selector de cumpleaños (hoy), fijado al montar.
+  const [today] = useState(() => new Date().toISOString().slice(0, 10));
 
   function setP<K extends keyof Personal>(key: K, value: Personal[K]) {
     setPersonal((prev) => ({ ...prev, [key]: value }));
@@ -115,6 +121,8 @@ export function ClientOnboardingForm({
     if (postalCodeRequired(personal.shippingCountry) && !personal.postalCode.trim())
       e.postalCode = "Obligatorio para envíos fuera de Colombia";
     if (personal.address.trim().length < 3) e.address = "Ingresa la dirección";
+    if (personal.birthDate && personal.birthDate > today)
+      e.birthDate = "Ingresa una fecha válida";
     if (!personal.privacyAccepted)
       e.privacyAccepted = "Debes aceptar la política de privacidad";
     return e;
@@ -203,8 +211,8 @@ export function ClientOnboardingForm({
         setSubmitError(body.error ?? "No pudimos guardar tu registro.");
         return;
       }
-      router.push("/dashboard");
-      router.refresh();
+      setDone({ id: body.orderId, number: body.orderNumber });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch {
       setLoading(false);
       setSubmitError("Ocurrió un error de conexión. Intenta nuevamente.");
@@ -226,6 +234,26 @@ export function ClientOnboardingForm({
       : step === 1
         ? itemsValid
         : true;
+
+  if (done) {
+    return (
+      <div className="rounded-3xl bg-white p-6 shadow-[0_10px_40px_rgba(20,150,166,0.10)] sm:p-10">
+        <OrderDone
+          title="¡Tu solicitud fue enviada!"
+          description="Recibimos tus datos y los detalles de tu joya. Un asesor te contactará pronto. Puedes descargar tu orden en PDF."
+          orderId={done.id}
+          orderNumber={done.number}
+        >
+          <Link
+            href="/dashboard"
+            className="rounded-full border border-edra-grey/30 px-6 py-3 text-sm font-medium text-edra-grey transition-colors hover:border-edra hover:text-edra"
+          >
+            Ir a mi panel
+          </Link>
+        </OrderDone>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-3xl bg-white p-6 shadow-[0_10px_40px_rgba(20,150,166,0.10)] sm:p-10">
@@ -288,6 +316,15 @@ export function ClientOnboardingForm({
                 </option>
               ))}
             </SelectField>
+            <Field
+              label="Fecha de cumpleaños"
+              type="date"
+              max={today}
+              value={personal.birthDate}
+              onChange={(e) => setP("birthDate", e.target.value)}
+              error={errors.birthDate}
+              optional
+            />
 
             {personal.contactMedium === "RED_SOCIAL" ? (
               <>
@@ -422,6 +459,14 @@ export function ClientOnboardingForm({
                 <SummaryRow label="Link" value={personal.socialLink} />
               </>
             ) : null}
+            <SummaryRow
+              label="Fecha de cumpleaños"
+              value={
+                personal.birthDate
+                  ? personal.birthDate.split("-").reverse().join("/")
+                  : "—"
+              }
+            />
             <SummaryRow label="País de envío" value={personal.shippingCountry} />
             <SummaryRow label="Ciudad o estado" value={personal.cityState} />
             <SummaryRow label="Código postal" value={personal.postalCode || "—"} />
@@ -443,7 +488,7 @@ export function ClientOnboardingForm({
               }
             >
               <SummaryRow label="Producto" value={labelOf(PRODUCTS, item.product)} />
-              {fieldsForProduct(item.product).map((key) => (
+              {fieldsForItem(item).map((key) => (
                 <SummaryRow
                   key={key}
                   label={ORDER_FIELD_META[key].label}

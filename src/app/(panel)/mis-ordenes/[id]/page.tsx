@@ -5,12 +5,13 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { PRODUCTS, labelOf } from "@/lib/form-options";
 import {
-  fieldsForProduct,
+  fieldsForItem,
   ORDER_FIELD_META,
   advisorFieldsForProduct,
   ADVISOR_FIELD_META,
 } from "@/lib/product-fields";
-import { orderFieldDisplay, type OrderItemState } from "@/lib/order-utils";
+import { orderFieldDisplay, toOrderItemState } from "@/lib/order-utils";
+import { OrderPdfLink } from "@/components/forms/order/order-done";
 import {
   ORDER_STATUS_LABELS,
   ORDER_STATUS_STYLES,
@@ -21,8 +22,6 @@ import {
   invoiceTypeLabel,
   orderProductsLabel,
 } from "@/lib/order-display";
-
-const s = (v?: string | null) => v ?? "";
 
 export default async function OrdenDetallePage({
   params,
@@ -49,19 +48,7 @@ export default async function OrdenDetallePage({
 
   const items = order.items.map((item) => ({
     id: item.id,
-    view: {
-      product: s(item.product),
-      size: s(item.size),
-      sizeLady: s(item.sizeLady),
-      sizeGentleman: s(item.sizeGentleman),
-      material: s(item.material),
-      gemType: s(item.gemType),
-      gemOther: s(item.gemOther),
-      engraving: s(item.engraving),
-      engravingLady: s(item.engravingLady),
-      engravingGentleman: s(item.engravingGentleman),
-      fontType: s(item.fontType),
-    } satisfies OrderItemState,
+    view: toOrderItemState(item),
     advisor: item,
   }));
 
@@ -105,6 +92,9 @@ export default async function OrdenDetallePage({
           </span>
           <span>Creada el {order.createdAt.toLocaleDateString("es-CO")}</span>
         </p>
+        <div className="mt-4">
+          <OrderPdfLink orderId={order.id} variant="outline" />
+        </div>
       </div>
 
       {/* Solicitud del cliente: un bloque por producto de la compra */}
@@ -118,7 +108,7 @@ export default async function OrdenDetallePage({
           </h2>
           <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
             <Row label="Producto" value={labelOf(PRODUCTS, view.product)} />
-            {fieldsForProduct(view.product).map((key) => (
+            {fieldsForItem(view).map((key) => (
               <Row
                 key={key}
                 label={ORDER_FIELD_META[key].label}
