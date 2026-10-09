@@ -106,13 +106,18 @@ export function AdminUsersTable({
                   key={u.id}
                   className="border-b border-edra-grey/10 align-middle text-edra-ink"
                 >
-                  <td className="py-3 pr-4">
+                  <td className="max-w-[10rem] break-words py-3 pr-4">
                     {u.name}
                     {isSelf ? (
                       <span className="ml-2 text-xs text-edra-grey">(tú)</span>
                     ) : null}
                   </td>
-                  <td className="py-3 pr-4 text-edra-grey">{u.email}</td>
+                  <td
+                    className="max-w-[12rem] truncate py-3 pr-4 text-edra-grey"
+                    title={u.email}
+                  >
+                    {u.email}
+                  </td>
                   <td className="py-3 pr-4">
                     <select
                       value={u.role}
@@ -142,15 +147,15 @@ export function AdminUsersTable({
                       </span>
                     )}
                   </td>
-                  <td className="py-3 pr-4 text-xs text-edra-grey">
+                  <td className="whitespace-nowrap py-3 pr-4 text-xs text-edra-grey">
                     {u.createdAtLabel}
                   </td>
                   <td className="py-3">
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       {u.role !== "ADMIN" ? (
                         <Link
                           href={`/admin/usuarios/${u.id}`}
-                          className="rounded-full border border-edra px-3 py-1 text-xs font-medium text-edra hover:bg-edra hover:text-white"
+                          className="rounded-full border border-edra whitespace-nowrap px-2.5 py-1 text-xs font-medium text-edra hover:bg-edra hover:text-white"
                         >
                           Editar
                         </Link>
@@ -160,7 +165,7 @@ export function AdminUsersTable({
                           type="button"
                           disabled={busy}
                           onClick={() => resendInvite(u.id)}
-                          className="rounded-full border border-edra px-3 py-1 text-xs font-medium text-edra hover:bg-edra hover:text-white disabled:opacity-50"
+                          className="rounded-full border border-edra whitespace-nowrap px-2.5 py-1 text-xs font-medium text-edra hover:bg-edra hover:text-white disabled:opacity-50"
                         >
                           Reenviar accesos
                         </button>
@@ -170,7 +175,7 @@ export function AdminUsersTable({
                           type="button"
                           disabled={busy}
                           onClick={() => toggleActive(u.id, !u.active)}
-                          className="rounded-full border border-edra-grey/40 px-3 py-1 text-xs font-medium text-edra-grey hover:bg-edra-grey/10 disabled:opacity-50"
+                          className="rounded-full border border-edra-grey/40 whitespace-nowrap px-2.5 py-1 text-xs font-medium text-edra-grey hover:bg-edra-grey/10 disabled:opacity-50"
                         >
                           {u.active ? "Desactivar" : "Activar"}
                         </button>
@@ -180,7 +185,7 @@ export function AdminUsersTable({
                           type="button"
                           disabled={busy}
                           onClick={() => remove(u.id, u.name)}
-                          className="rounded-full border border-red-300 px-3 py-1 text-xs font-medium text-red-500 hover:bg-red-50 disabled:opacity-50"
+                          className="rounded-full border border-red-300 whitespace-nowrap px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-50 disabled:opacity-50"
                         >
                           Eliminar
                         </button>
