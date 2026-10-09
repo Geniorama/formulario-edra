@@ -3,7 +3,11 @@ import {
   postalCodeRequired,
   materialColorOptionsFor,
 } from "@/lib/form-options";
-import { fieldsForItem, ORDER_FIELD_META } from "@/lib/product-fields";
+import {
+  fieldsForItem,
+  materialKeyForColor,
+  ORDER_FIELD_META,
+} from "@/lib/product-fields";
 
 export const registerSchema = z
   .object({
@@ -262,6 +266,8 @@ export const personalDataSchema = personalBase.superRefine((data, ctx) => {
 const engravingField = z.string().trim().max(1000).optional().or(z.literal(""));
 const optionalText = z.string().trim().max(80).optional().or(z.literal(""));
 
+const optionalMaterial = materialEnum.optional().or(z.literal(""));
+
 // Un producto dentro de la compra.
 export const orderItemSchema = z
   .object({
@@ -269,7 +275,10 @@ export const orderItemSchema = z
     size: z.string().optional().or(z.literal("")),
     sizeLady: z.string().optional().or(z.literal("")),
     sizeGentleman: z.string().optional().or(z.literal("")),
-    material: materialEnum,
+    material: optionalMaterial,
+    materialLady: optionalMaterial,
+    materialGentleman: optionalMaterial,
+    materialRing: optionalMaterial,
     materialColor: optionalText,
     materialColorLady: optionalText,
     materialColorGentleman: optionalText,
@@ -286,11 +295,20 @@ export const orderItemSchema = z
     symbolRing: optionalText,
   })
   .superRefine((data, ctx) => {
-    // El color es obligatorio cuando el material lo lleva (la plata no).
-    const colors = materialColorOptionsFor(data.material).map((o) => o.value);
+    // El material es obligatorio en cada pieza que lo pide, y su color
+    // cuando el material lo lleva (la plata y el platino 950 no).
     for (const key of fieldsForItem(data)) {
       const meta = ORDER_FIELD_META[key];
-      if (meta.kind === "color" && !colors.includes(data[key] ?? "")) {
+      const value = data[key] ?? "";
+      const valid =
+        meta.kind === "material"
+          ? Boolean(value)
+          : meta.kind === "color"
+            ? materialColorOptionsFor(
+                data[materialKeyForColor(data.product, key)]
+              ).some((o) => o.value === value)
+            : true;
+      if (!valid) {
         ctx.addIssue({
           path: [key],
           code: "custom",

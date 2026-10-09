@@ -18,6 +18,9 @@ export type OrderFieldKey =
   | "sizeLady"
   | "sizeGentleman"
   | "material"
+  | "materialLady"
+  | "materialGentleman"
+  | "materialRing"
   | "materialColor"
   | "materialColorLady"
   | "materialColorGentleman"
@@ -71,6 +74,24 @@ export const ORDER_FIELD_META: Record<
   },
   material: {
     label: "Material",
+    kind: "material",
+    required: true,
+    group: "general",
+  },
+  materialLady: {
+    label: "Material argolla dama",
+    kind: "material",
+    required: true,
+    group: "general",
+  },
+  materialGentleman: {
+    label: "Material argolla hombre",
+    kind: "material",
+    required: true,
+    group: "general",
+  },
+  materialRing: {
+    label: "Material anillo de compromiso",
     kind: "material",
     required: true,
     group: "general",
@@ -170,13 +191,16 @@ export const PRODUCT_FIELDS: Record<string, OrderFieldKey[]> = {
     "symbol",
   ],
   ANILLOS: ["size", "material", "materialColor", "gemType"],
-  // Argollas (dama y caballero) + anillo de compromiso.
+  // Argollas (dama y caballero) + anillo de compromiso. Cada pieza lleva su
+  // propio material y color: se pueden combinar.
   SET_MATRIMONIAL: [
     "sizeLady",
     "sizeGentleman",
-    "material",
+    "materialLady",
     "materialColorLady",
+    "materialGentleman",
     "materialColorGentleman",
+    "materialRing",
     "materialColorRing",
     "gemType",
     "engravingLady",
@@ -209,17 +233,40 @@ export function fieldsForProduct(product?: string): OrderFieldKey[] {
   return PRODUCT_FIELDS[product] ?? [];
 }
 
+const COLOR_MATERIAL_KEY: Partial<Record<OrderFieldKey, OrderFieldKey>> = {
+  materialColorLady: "materialLady",
+  materialColorGentleman: "materialGentleman",
+  materialColorRing: "materialRing",
+};
+
+/**
+ * Campo de material del que depende un campo de color: el de su propia pieza
+ * si el producto lo pide por separado (set matrimonial); si no, el general.
+ */
+export function materialKeyForColor(
+  product: string | null | undefined,
+  key: OrderFieldKey
+): OrderFieldKey {
+  const own = COLOR_MATERIAL_KEY[key];
+  return own && fieldsForProduct(product ?? undefined).includes(own)
+    ? own
+    : "material";
+}
+
 /**
  * Campos que aplican a un producto ya diligenciado: los de color solo cuando
- * el material elegido lleva color (la plata no).
+ * el material de esa pieza lleva color (la plata y el platino 950 no).
  */
-export function fieldsForItem(item: {
-  product?: string | null;
-  material?: string | null;
-}): OrderFieldKey[] {
-  const hasColor = materialColorOptionsFor(item.material).length > 0;
+export function fieldsForItem(
+  item: { product?: string | null } & Partial<
+    Record<OrderFieldKey, string | null>
+  >
+): OrderFieldKey[] {
   return fieldsForProduct(item.product ?? undefined).filter(
-    (key) => hasColor || ORDER_FIELD_META[key].kind !== "color"
+    (key) =>
+      ORDER_FIELD_META[key].kind !== "color" ||
+      materialColorOptionsFor(item[materialKeyForColor(item.product, key)])
+        .length > 0
   );
 }
 
@@ -249,12 +296,16 @@ export function symbolOptionsFor(
   return isThinEngraving(product, key) ? THIN_RING_SYMBOLS : SYMBOLS;
 }
 
-/** Guías visuales que aplican al grabado de un campo. */
+/**
+ * Guías visuales que aplican al grabado de un campo. El anillo de compromiso
+ * no lleva guía: la de sortijas delgadas solo aplica a los cintillos.
+ */
 export function engravingGuidesFor(
   product: string,
   key: OrderFieldKey
 ): readonly EngravingGuide[] {
-  return isThinEngraving(product, key) ? THIN_RING_GUIDES : ENGRAVING_GUIDES;
+  if (ORDER_FIELD_META[key].group === "engravingRing") return [];
+  return product === "CINTILLO" ? THIN_RING_GUIDES : ENGRAVING_GUIDES;
 }
 
 /** Sugerencia de legibilidad que acompaña a cada campo de grabado. */

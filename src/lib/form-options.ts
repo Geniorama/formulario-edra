@@ -102,8 +102,8 @@ export const MATERIALS = [
 
 type Option = { value: string; label: string };
 
-// Colores del material. La plata no tiene color; los materiales combinados
-// solo ofrecen el color del oro que los acompaña.
+// Colores del material. La plata y el platino 950 no tienen color; los
+// materiales combinados solo ofrecen el color del oro que los acompaña.
 export const MATERIAL_COLORS: readonly Option[] = [
   { value: "BLANCO", label: "Blanco" },
   { value: "AMARILLO", label: "Amarillo" },
@@ -113,7 +113,11 @@ export const MATERIAL_COLORS: readonly Option[] = [
   { value: "ROSA_AMARILLO", label: "Rosa - Amarillo" },
 ];
 
-const MATERIALS_WITHOUT_COLOR: readonly string[] = ["PLATA_925", "PLATA_950"];
+const MATERIALS_WITHOUT_COLOR: readonly string[] = [
+  "PLATA_925",
+  "PLATA_950",
+  "PLATINO_950",
+];
 
 const COMBINED_MATERIAL_COLORS: Record<string, readonly Option[]> = {
   ORO_18K_PLATA: [
@@ -205,6 +209,7 @@ const fontsByNumber = (numbers: readonly string[]) =>
   FONT_TYPES.filter((f) => numbers.includes(f.slice(0, 2)));
 
 // Sortijas delgadas (cintillos): fuentes de la guía "Sortijas delgadas".
+// La guía solo se muestra en los cintillos, no en el anillo de compromiso.
 export const THIN_RING_FONTS = fontsByNumber([
   "02", "05", "08", "09", "10", "12", "17", "18", "23", "29", "31",
 ]);

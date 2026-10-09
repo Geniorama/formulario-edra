@@ -230,9 +230,13 @@ model OrderItem {
   size               String? // talla (anillo)
   sizeLady           String? // talla dama
   sizeGentleman      String? // talla caballero
-  material           Material?
-  // Color del material (no aplica a la plata). Valores y etiquetas en
-  // `materialColorOptionsFor` (src/lib/form-options.ts).
+  material           Material? // productos con un solo material
+  // Set matrimonial: cada pieza lleva su propio material (se pueden combinar).
+  materialLady       Material? // argolla dama
+  materialGentleman  Material? // argolla caballero
+  materialRing       Material? // anillo de compromiso
+  // Color del material (no aplica a la plata ni al platino 950). Valores y
+  // etiquetas en `materialColorOptionsFor` (src/lib/form-options.ts).
   materialColor          String? // productos de una sola pieza
   materialColorLady      String? // argolla dama
   materialColorGentleman String? // argolla caballero

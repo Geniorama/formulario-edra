@@ -7,6 +7,7 @@ import {
   ORDER_FIELD_META,
   advisorFieldsForProduct,
   ADVISOR_FIELD_META,
+  type AdvisorFieldKey,
 } from "@/lib/product-fields";
 import { orderFieldDisplay, toOrderItemState } from "@/lib/order-utils";
 import {
@@ -94,25 +95,30 @@ export async function GET(_request: Request, { params }: Params) {
 
   order.items.forEach((item, index) => {
     const view = toOrderItemState(item);
-    const rows: [string, string][] = [
-      ["Producto", labelOf(PRODUCTS, view.product)],
-      ...fieldsForItem(view).map(
-        (key): [string, string] => [
+    const clientKeys = fieldsForItem(view);
+    const clientRows = (general: boolean) =>
+      clientKeys
+        .filter((key) => (ORDER_FIELD_META[key].group === "general") === general)
+        .map((key): [string, string] => [
           ORDER_FIELD_META[key].label,
           orderFieldDisplay(view, key),
-        ]
-      ),
-    ];
+        ]);
     // Datos técnicos del asesor: solo los que ya están diligenciados.
-    for (const key of [
-      ...advisorFieldsForProduct(view.product),
-      "finalDescription" as const,
-    ]) {
-      const value = item[key as keyof typeof item];
-      if (typeof value === "string" && value.trim()) {
-        rows.push([ADVISOR_FIELD_META[key].label, value]);
-      }
-    }
+    const advisorRows = (keys: AdvisorFieldKey[]) =>
+      keys.flatMap((key): [string, string][] => {
+        const value = item[key as keyof typeof item];
+        return typeof value === "string" && value.trim()
+          ? [[ADVISOR_FIELD_META[key].label, value]]
+          : [];
+      });
+    // Los detalles técnicos van antes de los grabados.
+    const rows: [string, string][] = [
+      ["Producto", labelOf(PRODUCTS, view.product)],
+      ...clientRows(true),
+      ...advisorRows(advisorFieldsForProduct(view.product)),
+      ...clientRows(false),
+      ...advisorRows(["finalDescription"]),
+    ];
     sections.push({
       title:
         order.items.length > 1

@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment, useState } from "react";
 import { FileText, Lightbulb, Plus, Trash2 } from "lucide-react";
 import { Field, SelectField } from "@/components/ui/form-fields";
 import { SymbolPicker } from "@/components/forms/order/symbol-picker";
@@ -14,6 +15,7 @@ import {
   fieldsForItem,
   engravingGuidesFor,
   engravingHint,
+  materialKeyForColor,
   ORDER_FIELD_META,
   type OrderFieldGroup,
   type OrderFieldKey,
@@ -37,17 +39,43 @@ export function OrderItemFields({
   onProduct,
   onGemOther,
   errors,
+  beforeEngravings,
 }: {
   item: OrderItemState;
   onField: (key: OrderFieldKey, value: string) => void;
   onProduct: (value: string) => void;
   onGemOther: (value: string) => void;
   errors: Errors;
+  /** Contenido que va entre los datos generales y los grabados. */
+  beforeEngravings?: React.ReactNode;
 }) {
+  // Set matrimonial: las argollas pueden compartir material o combinarlo.
+  const [sameMaterialChecked, setSameMaterialChecked] = useState(
+    item.materialLady === item.materialGentleman
+  );
+  const sameMaterial =
+    sameMaterialChecked && item.materialLady === item.materialGentleman;
+
+  function toggleSameMaterial(checked: boolean) {
+    setSameMaterialChecked(checked);
+    if (checked) onField("materialGentleman", item.materialLady);
+  }
+
+  function setField(key: OrderFieldKey, value: string) {
+    onField(key, value);
+    if (key === "materialLady" && sameMaterial) {
+      onField("materialGentleman", value);
+    }
+  }
+
   function renderField(key: OrderFieldKey) {
     const meta = ORDER_FIELD_META[key];
     const value = item[key];
     const err = errors[key];
+    const label =
+      key === "materialLady" && sameMaterial
+        ? "Material de las argollas"
+        : meta.label;
 
     // Grabado: sin límite de caracteres, solo una sugerencia de legibilidad.
     if (meta.kind === "engraving") {
@@ -92,7 +120,9 @@ export function OrderItemFields({
         : meta.kind === "material"
           ? MATERIALS
           : meta.kind === "color"
-            ? materialColorOptionsFor(item.material)
+            ? materialColorOptionsFor(
+                item[materialKeyForColor(item.product, key)]
+              )
             : meta.kind === "gem"
               ? GEM_TYPES
               : engravingOptionsFor(item, key).map((f) => ({
@@ -102,9 +132,9 @@ export function OrderItemFields({
 
     const select = (
       <SelectField
-        label={meta.label}
+        label={label}
         value={value}
-        onChange={(e) => onField(key, e.target.value)}
+        onChange={(e) => setField(key, e.target.value)}
         error={err}
         optional={!meta.required}
       >
@@ -139,12 +169,27 @@ export function OrderItemFields({
     return <div key={key}>{select}</div>;
   }
 
-  // El color solo aparece cuando el material lo lleva (la plata no).
+  // El color solo aparece cuando el material lo lleva (la plata y el platino
+  // 950 no).
   const keys = fieldsForItem(item);
-  const engravingGroups = ENGRAVING_GROUPS.map((g) => ({
-    ...g,
-    keys: keys.filter((k) => ORDER_FIELD_META[k].group === g.group),
-  })).filter((g) => g.keys.length > 0);
+  const canShareMaterial =
+    keys.includes("materialLady") && keys.includes("materialGentleman");
+  const generalKeys = keys.filter(
+    (k) =>
+      ORDER_FIELD_META[k].group === "general" &&
+      !(k === "materialGentleman" && sameMaterial)
+  );
+  const engravingGroups = ENGRAVING_GROUPS.map((g) => {
+    const groupKeys = keys.filter((k) => ORDER_FIELD_META[k].group === g.group);
+    return {
+      ...g,
+      keys: groupKeys,
+      guides:
+        groupKeys.length > 0
+          ? engravingGuidesFor(item.product, groupKeys[0])
+          : [],
+    };
+  }).filter((g) => g.keys.length > 0);
 
   return (
     <div className="space-y-5">
@@ -165,12 +210,29 @@ export function OrderItemFields({
       {item.product ? (
         <>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            {keys
-              .filter((k) => ORDER_FIELD_META[k].group === "general")
-              .map(renderField)}
+            {generalKeys.map((key) =>
+              key === "materialLady" && canShareMaterial ? (
+                <Fragment key={key}>
+                  <label className="flex cursor-pointer items-start gap-3 text-sm text-edra-ink sm:col-span-2">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-edra-grey/40 text-edra accent-edra"
+                      checked={sameMaterial}
+                      onChange={(e) => toggleSameMaterial(e.target.checked)}
+                    />
+                    <span>Mismo material en ambas argollas</span>
+                  </label>
+                  {renderField(key)}
+                </Fragment>
+              ) : (
+                renderField(key)
+              )
+            )}
           </div>
 
-          {engravingGroups.map(({ group, title, keys: groupKeys }) => (
+          {beforeEngravings}
+
+          {engravingGroups.map(({ group, title, keys: groupKeys, guides }) => (
             <div key={group} className="space-y-5">
               {engravingGroups.length > 1 ? (
                 <p className="border-t border-black/5 pt-5 text-xs font-semibold uppercase tracking-wide text-edra-grey/80">
@@ -186,20 +248,22 @@ export function OrderItemFields({
                   .map(renderField)}
               </div>
               {/* Guías visuales de fuentes y símbolos que aplican al grabado. */}
-              <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-                {engravingGuidesFor(item.product, groupKeys[0]).map((guide) => (
-                  <a
-                    key={guide.href}
-                    href={guide.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs font-medium text-edra hover:text-edra-dark"
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    Ver guía: {guide.label}
-                  </a>
-                ))}
-              </div>
+              {guides.length > 0 ? (
+                <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                  {guides.map((guide) => (
+                    <a
+                      key={guide.href}
+                      href={guide.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-edra hover:text-edra-dark"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      Ver guía: {guide.label}
+                    </a>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ))}
         </>

@@ -2,6 +2,7 @@ import {
   fieldsForItem,
   fieldsForProduct,
   fontOptionsFor,
+  materialKeyForColor,
   symbolOptionsFor,
   ORDER_FIELD_META,
   type OrderFieldKey,
@@ -29,6 +30,9 @@ export const emptyOrderItem: OrderItemState = {
   sizeLady: "",
   sizeGentleman: "",
   material: "",
+  materialLady: "",
+  materialGentleman: "",
+  materialRing: "",
   materialColor: "",
   materialColorLady: "",
   materialColorGentleman: "",
@@ -53,12 +57,19 @@ export function toOrderItemState(
 ): OrderItemState {
   const state = { ...emptyOrderItem };
   for (const key of ITEM_STATE_KEYS) state[key] = raw[key] ?? "";
+  // Órdenes anteriores al material por pieza: heredan el material único.
+  for (const key of fieldsForProduct(state.product)) {
+    if (ORDER_FIELD_META[key].kind === "material" && !state[key]) {
+      state[key] = state.material;
+    }
+  }
   return state;
 }
 
 /**
- * Cambia un campo del producto. Al cambiar el material se descartan los
- * colores que ya no aplican (p. ej. al pasar a plata, que no lleva color).
+ * Cambia un campo del producto. Al cambiar un material se descartan los
+ * colores de esa pieza que ya no aplican (p. ej. al pasar a plata, que no
+ * lleva color).
  */
 export function withOrderField(
   item: OrderItemState,
@@ -66,10 +77,14 @@ export function withOrderField(
   value: string
 ): OrderItemState {
   const next = { ...item, [key]: value };
-  if (key === "material") {
+  if (ORDER_FIELD_META[key].kind === "material") {
     const allowed = materialColorOptionsFor(value).map((o) => o.value);
     for (const k of fieldsForProduct(item.product)) {
-      if (ORDER_FIELD_META[k].kind === "color" && !allowed.includes(next[k])) {
+      if (
+        ORDER_FIELD_META[k].kind === "color" &&
+        materialKeyForColor(item.product, k) === key &&
+        !allowed.includes(next[k])
+      ) {
         next[k] = "";
       }
     }
@@ -134,7 +149,12 @@ export function orderFieldDisplay(
   const value = item[key];
   if (!value) return "—";
   if (meta.kind === "material") return labelOf(MATERIALS, value);
-  if (meta.kind === "color") return materialColorLabel(item.material, value);
+  if (meta.kind === "color") {
+    return materialColorLabel(
+      item[materialKeyForColor(item.product, key)],
+      value
+    );
+  }
   if (meta.kind === "size") return sizeLabel(value);
   if (meta.kind === "symbol") return symbolLabel(value);
   if (meta.kind === "gem") {

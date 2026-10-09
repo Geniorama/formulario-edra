@@ -592,6 +592,31 @@ export function AdvisorOrderForm({
   );
 }
 
+/** Campos de la solicitud del cliente en solo lectura. */
+function ClientRows({
+  item,
+  keys,
+}: {
+  item: OrderItemState;
+  keys: OrderFieldKey[];
+}) {
+  return (
+    <dl className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
+      {keys.map((key) => (
+        <div
+          key={key}
+          className="flex justify-between gap-4 border-b border-black/5 py-1 text-sm last:border-0"
+        >
+          <dt className="text-edra-grey">{ORDER_FIELD_META[key].label}</dt>
+          <dd className="text-right font-medium text-edra-ink">
+            {orderFieldDisplay(item, key)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 /** Bloque de un producto: solicitud del cliente + datos técnicos del asesor. */
 function ItemCard({
   item,
@@ -616,6 +641,44 @@ function ItemCard({
 }) {
   const product = item.client.product;
   const keys = advisorFieldsForProduct(product);
+  const clientKeys = fieldsForItem(item.client);
+  const engravingKeys = clientKeys.filter(
+    (k) => ORDER_FIELD_META[k].group !== "general"
+  );
+
+  // Los detalles técnicos van antes de los grabados (lo último del producto).
+  const technical =
+    keys.length > 0 ? (
+      <div className="space-y-5 border-t border-black/5 pt-5">
+        <p className="text-xs font-medium uppercase tracking-wide text-edra-grey/80">
+          Detalles técnicos
+        </p>
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          {keys
+            .filter((k) => !ADVISOR_FIELD_META[k].multiline)
+            .map((k) => (
+              <Field
+                key={k}
+                label={ADVISOR_FIELD_META[k].label}
+                value={item.fields[k] ?? ""}
+                onChange={(e) => onField(index, k, e.target.value)}
+                optional
+              />
+            ))}
+        </div>
+        {keys
+          .filter((k) => ADVISOR_FIELD_META[k].multiline)
+          .map((k) => (
+            <Textarea
+              key={k}
+              label={ADVISOR_FIELD_META[k].label}
+              value={item.fields[k] ?? ""}
+              onChange={(e) => onField(index, k, e.target.value)}
+              optional
+            />
+          ))}
+      </div>
+    ) : null;
 
   return (
     <div className="space-y-5 rounded-2xl border border-black/5 bg-edra-bg/30 p-5">
@@ -647,55 +710,26 @@ function ItemCard({
             onField={(key, value) => onClientField(index, key, value)}
             onProduct={(value) => onClientProduct(index, value)}
             onGemOther={(value) => onClientGemOther(index, value)}
+            beforeEngravings={technical}
           />
         </div>
       ) : (
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
-          {fieldsForItem(item.client).map((key) => (
-            <div
-              key={key}
-              className="flex justify-between gap-4 border-b border-black/5 py-1 text-sm last:border-0"
-            >
-              <dt className="text-edra-grey">{ORDER_FIELD_META[key].label}</dt>
-              <dd className="text-right font-medium text-edra-ink">
-                {orderFieldDisplay(item.client, key)}
-              </dd>
+        <>
+          <ClientRows
+            item={item.client}
+            keys={clientKeys.filter((k) => !engravingKeys.includes(k))}
+          />
+          {technical}
+          {engravingKeys.length > 0 ? (
+            <div className="space-y-3 border-t border-black/5 pt-5">
+              <p className="text-xs font-medium uppercase tracking-wide text-edra-grey/80">
+                Grabados
+              </p>
+              <ClientRows item={item.client} keys={engravingKeys} />
             </div>
-          ))}
-        </dl>
+          ) : null}
+        </>
       )}
-
-      {keys.length > 0 ? (
-        <div className="space-y-5 border-t border-black/5 pt-5">
-          <p className="text-xs font-medium uppercase tracking-wide text-edra-grey/80">
-            Detalles técnicos
-          </p>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            {keys
-              .filter((k) => !ADVISOR_FIELD_META[k].multiline)
-              .map((k) => (
-                <Field
-                  key={k}
-                  label={ADVISOR_FIELD_META[k].label}
-                  value={item.fields[k] ?? ""}
-                  onChange={(e) => onField(index, k, e.target.value)}
-                  optional
-                />
-              ))}
-          </div>
-          {keys
-            .filter((k) => ADVISOR_FIELD_META[k].multiline)
-            .map((k) => (
-              <Textarea
-                key={k}
-                label={ADVISOR_FIELD_META[k].label}
-                value={item.fields[k] ?? ""}
-                onChange={(e) => onField(index, k, e.target.value)}
-                optional
-              />
-            ))}
-        </div>
-      ) : null}
 
       {/* Descripción del producto: se pide para cada producto de la compra. */}
       <Textarea

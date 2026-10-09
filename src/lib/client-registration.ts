@@ -8,7 +8,11 @@ import {
   GEM_TYPES,
   materialColorOptionsFor,
 } from "@/lib/form-options";
-import { fieldsForProduct, type OrderFieldKey } from "@/lib/product-fields";
+import {
+  fieldsForProduct,
+  materialKeyForColor,
+  type OrderFieldKey,
+} from "@/lib/product-fields";
 import { MAX_ORDER_ITEMS } from "@/lib/validations";
 import type {
   DocumentType,
@@ -62,18 +66,29 @@ export function sanitizePersonal(raw: Record<string, unknown> = {}) {
 export function sanitizeOrderItem(raw: Record<string, unknown> = {}) {
   const gemType = inSet(GEM_TYPES, raw.gemType) as GemType | null;
   const product = inSet(PRODUCTS, raw.product) as Product | null;
-  const material = inSet(MATERIALS, raw.material) as Material | null;
-  // El color solo se guarda si aplica al producto y al material elegidos.
+  // El material y el color solo se guardan si aplican al producto; el color,
+  // además, debe ser uno de los que ofrece el material de esa pieza.
   const fields = fieldsForProduct(product ?? undefined);
-  const colors = materialColorOptionsFor(material);
+  const material = (key: OrderFieldKey) =>
+    fields.includes(key)
+      ? (inSet(MATERIALS, raw[key]) as Material | null)
+      : null;
   const color = (key: OrderFieldKey) =>
-    fields.includes(key) ? inSet(colors, raw[key]) : null;
+    fields.includes(key)
+      ? inSet(
+          materialColorOptionsFor(material(materialKeyForColor(product, key))),
+          raw[key]
+        )
+      : null;
   return {
     product,
     size: str(raw.size),
     sizeLady: str(raw.sizeLady),
     sizeGentleman: str(raw.sizeGentleman),
-    material,
+    material: material("material"),
+    materialLady: material("materialLady"),
+    materialGentleman: material("materialGentleman"),
+    materialRing: material("materialRing"),
     materialColor: color("materialColor"),
     materialColorLady: color("materialColorLady"),
     materialColorGentleman: color("materialColorGentleman"),
