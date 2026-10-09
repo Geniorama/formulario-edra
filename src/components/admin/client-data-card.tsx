@@ -35,9 +35,14 @@ export function ClientDataCard({
   socialNetwork,
   socialLink,
   initial,
+  title = "Cliente",
+  hideAccountData = false,
 }: {
   userId: string;
   canEdit: boolean;
+  title?: string;
+  /** Oculta nombre y correo (en la edición del usuario van en otro formulario). */
+  hideAccountData?: boolean;
   email: string;
   contactMedium: string;
   socialNetwork: string;
@@ -94,7 +99,7 @@ export function ClientDataCard({
     <div className="rounded-3xl bg-white p-6 shadow-[0_10px_40px_rgba(20,150,166,0.10)] sm:p-8">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-edra-grey">
-          Cliente
+          {title}
         </h2>
         {canEdit && !editing ? (
           <button
@@ -122,16 +127,20 @@ export function ClientDataCard({
           {error ? <FormAlert type="error">{error}</FormAlert> : null}
 
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <Field
-              label="Nombres"
-              value={data.firstName}
-              onChange={(e) => set("firstName", e.target.value)}
-            />
-            <Field
-              label="Apellidos"
-              value={data.lastName}
-              onChange={(e) => set("lastName", e.target.value)}
-            />
+            {hideAccountData ? null : (
+              <>
+                <Field
+                  label="Nombres"
+                  value={data.firstName}
+                  onChange={(e) => set("firstName", e.target.value)}
+                />
+                <Field
+                  label="Apellidos"
+                  value={data.lastName}
+                  onChange={(e) => set("lastName", e.target.value)}
+                />
+              </>
+            )}
             <SelectField
               label="Tipo de documento"
               value={data.documentType}
@@ -229,8 +238,12 @@ export function ClientDataCard({
         </div>
       ) : (
         <dl className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
-          <Row label="Nombre" value={`${data.firstName} ${data.lastName}`} />
-          <Row label="Correo" value={email} />
+          {hideAccountData ? null : (
+            <>
+              <Row label="Nombre" value={`${data.firstName} ${data.lastName}`} />
+              <Row label="Correo" value={email} />
+            </>
+          )}
           <Row
             label="Documento"
             value={

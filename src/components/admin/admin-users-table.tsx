@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Role } from "@/generated/prisma/enums";
 import { ROLE_OPTIONS } from "@/lib/roles";
@@ -146,6 +147,14 @@ export function AdminUsersTable({
                   </td>
                   <td className="py-3">
                     <div className="flex flex-wrap items-center gap-2">
+                      {u.role !== "ADMIN" ? (
+                        <Link
+                          href={`/admin/usuarios/${u.id}`}
+                          className="rounded-full border border-edra px-3 py-1 text-xs font-medium text-edra hover:bg-edra hover:text-white"
+                        >
+                          Editar
+                        </Link>
+                      ) : null}
                       {u.pending ? (
                         <button
                           type="button"

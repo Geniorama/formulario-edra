@@ -35,6 +35,7 @@ Proyecto **Joyería Edra**: autenticación con Next.js 16 (App Router) + TypeScr
 - Enum `Role { ADMIN, ASESOR, CLIENTE }` (default `CLIENTE`). El `role` va en el JWT/sesión (`session.user.role`).
 - Front solo registra `CLIENTE`. Admin se crea con `npm run db:seed` (admin@joyeriaedra.com / Admin1234*).
 - `/admin` (solo ADMIN) crea usuarios → invitación por correo (`ACCOUNT_INVITE`) → `/establecer-contrasena`.
+- **Editar usuario** (solo ADMIN, solo clientes y asesores): botón "Editar" de la tabla → `/admin/usuarios/[id]`. "Datos de la cuenta" (nombres, apellidos y teléfono → `AdminEditUserForm`, `PATCH /api/admin/users/[id]` con `adminUpdateUserSchema`; el **correo se muestra pero no se puede editar** y la API rechaza editar a otro ADMIN) y, si es cliente, sus datos personales y de envío con `ClientDataCard` (`hideAccountData`).
 - Protección: middleware exige login en `/dashboard` y `/admin`; el rol se valida en la página/API (`auth()` con config completa).
 
 ## Dashboard (escalable por módulos)

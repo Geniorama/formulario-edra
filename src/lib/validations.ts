@@ -71,12 +71,17 @@ export const adminCreateUserSchema = z.object({
   role: roleEnum,
 });
 
-export const adminUpdateUserSchema = z
-  .object({
+// Rol/estado (tabla de usuarios) y datos básicos de la cuenta (pantalla de
+// edición, solo para clientes y asesores). Todos los campos son opcionales.
+export const adminUpdateUserSchema = adminCreateUserSchema
+  // El correo no se puede cambiar.
+  .omit({ role: true, email: true })
+  .partial()
+  .extend({
     role: roleEnum.optional(),
     active: z.boolean().optional(),
   })
-  .refine((data) => data.role !== undefined || data.active !== undefined, {
+  .refine((data) => Object.values(data).some((v) => v !== undefined), {
     message: "Nada que actualizar",
   });
 

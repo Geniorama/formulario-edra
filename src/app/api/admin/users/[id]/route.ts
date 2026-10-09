@@ -28,7 +28,10 @@ export async function PATCH(request: Request, { params }: Params) {
 
   const parsed = adminUpdateUserSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Datos inválidos" }, { status: 422 });
+    return NextResponse.json(
+      { error: "Datos inválidos", issues: parsed.error.flatten().fieldErrors },
+      { status: 422 }
+    );
   }
 
   const existing = await prisma.user.findUnique({ where: { id } });
@@ -36,7 +39,29 @@ export async function PATCH(request: Request, { params }: Params) {
     return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
   }
 
-  await prisma.user.update({ where: { id }, data: parsed.data });
+  const { firstName, lastName, phone, role, active } = parsed.data;
+
+  // Los datos básicos solo se editan en clientes y asesores, no en otros admins.
+  const editsBasicData = [firstName, lastName, phone].some(
+    (v) => v !== undefined
+  );
+  if (editsBasicData && existing.role === "ADMIN") {
+    return NextResponse.json(
+      { error: "No se pueden editar los datos de otro administrador." },
+      { status: 403 }
+    );
+  }
+
+  await prisma.user.update({
+    where: { id },
+    data: {
+      firstName,
+      lastName,
+      phone: phone === undefined ? undefined : phone || null,
+      role,
+      active,
+    },
+  });
 
   return NextResponse.json({ ok: true, message: "Usuario actualizado." });
 }
