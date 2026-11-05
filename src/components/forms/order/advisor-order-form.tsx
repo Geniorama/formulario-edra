@@ -16,6 +16,7 @@ import {
 import { Stepper } from "@/components/forms/onboarding/stepper";
 import { OrderItemFields } from "@/components/forms/order/order-fields";
 import { OrderDone } from "@/components/forms/order/order-done";
+import { ProjectImageField } from "@/components/forms/order/project-image-field";
 import {
   advisorFieldsForProduct,
   ADVISOR_FIELD_META,
@@ -93,6 +94,7 @@ export function AdvisorOrderForm({
     manufacturingNotes: string;
     final: Record<string, string>;
     receipt: ReceiptInfo;
+    projectImageName: string | null;
   };
 }) {
   const router = useRouter();
@@ -416,6 +418,11 @@ export function AdvisorOrderForm({
               Agregar producto a la compra
             </button>
           ) : null}
+
+          <ProjectImageField
+            orderId={orderId}
+            initialName={initial.projectImageName}
+          />
         </div>
       ) : null}
 

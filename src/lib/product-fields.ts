@@ -85,7 +85,7 @@ export const ORDER_FIELD_META: Record<
     group: "general",
   },
   materialGentleman: {
-    label: "Material argolla hombre",
+    label: "Material argolla caballero",
     kind: "material",
     required: true,
     group: "general",
@@ -109,7 +109,7 @@ export const ORDER_FIELD_META: Record<
     group: "general",
   },
   materialColorGentleman: {
-    label: "Color material hombre",
+    label: "Color material caballero",
     kind: "color",
     required: true,
     group: "general",

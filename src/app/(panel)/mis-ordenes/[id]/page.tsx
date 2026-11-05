@@ -35,8 +35,8 @@ export default async function OrdenDetallePage({
   const { id } = await params;
   const order = await prisma.order.findFirst({
     where: { id, userId: session.user.id },
-    // El archivo del comprobante se descarga aparte (no se trae en la página).
-    omit: { depositReceiptData: true },
+    // Los archivos adjuntos se descargan aparte (no se traen en la página).
+    omit: { depositReceiptData: true, projectImageData: true },
     include: {
       items: { orderBy: { position: "asc" } },
       advisor: {

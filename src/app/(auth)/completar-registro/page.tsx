@@ -21,6 +21,7 @@ export default async function CompletarRegistroPage() {
   const order = await prisma.order.findFirst({
     where: { userId: session.user.id },
     orderBy: { createdAt: "asc" },
+    omit: { depositReceiptData: true, projectImageData: true },
     include: { items: { orderBy: { position: "asc" } } },
   });
 

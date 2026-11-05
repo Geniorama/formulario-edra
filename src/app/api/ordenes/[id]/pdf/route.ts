@@ -3,14 +3,6 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { DOCUMENT_TYPES, PRODUCTS, labelOf } from "@/lib/form-options";
 import {
-  fieldsForItem,
-  ORDER_FIELD_META,
-  advisorFieldsForProduct,
-  ADVISOR_FIELD_META,
-  type AdvisorFieldKey,
-} from "@/lib/product-fields";
-import { orderFieldDisplay, toOrderItemState } from "@/lib/order-utils";
-import {
   ORDER_STATUS_LABELS,
   formatOrderNumber,
   formatMoney,
@@ -21,6 +13,7 @@ import {
   paymentMethodLabel,
 } from "@/lib/order-display";
 import { buildOrderPdf, type PdfSection } from "@/lib/order-pdf";
+import { orderItemPdfSection } from "@/lib/order-pdf-item";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -94,43 +87,20 @@ export async function GET(_request: Request, { params }: Params) {
   ];
 
   order.items.forEach((item, index) => {
-    const view = toOrderItemState(item);
-    const clientKeys = fieldsForItem(view);
-    const clientRows = (general: boolean) =>
-      clientKeys
-        .filter((key) => (ORDER_FIELD_META[key].group === "general") === general)
-        .map((key): [string, string] => [
-          ORDER_FIELD_META[key].label,
-          orderFieldDisplay(view, key),
-        ]);
-    // Datos técnicos del asesor: solo los que ya están diligenciados.
-    const advisorRows = (keys: AdvisorFieldKey[]) =>
-      keys.flatMap((key): [string, string][] => {
-        const value = item[key as keyof typeof item];
-        return typeof value === "string" && value.trim()
-          ? [[ADVISOR_FIELD_META[key].label, value]]
-          : [];
-      });
-    // Los detalles técnicos van antes de los grabados.
-    const rows: [string, string][] = [
-      ["Producto", labelOf(PRODUCTS, view.product)],
-      ...clientRows(true),
-      ...advisorRows(advisorFieldsForProduct(view.product)),
-      ...clientRows(false),
-      ...advisorRows(["finalDescription"]),
-    ];
-    sections.push({
-      title:
+    sections.push(
+      orderItemPdfSection(
+        item,
         order.items.length > 1
-          ? `Producto ${index + 1}: ${labelOf(PRODUCTS, view.product)}`
-          : "Producto",
-      rows,
-    });
+          ? `Producto ${index + 1}: ${labelOf(PRODUCTS, item.product)}`
+          : "Producto"
+      )
+    );
   });
 
   const pending = (v: string) => (v === "—" ? "Pendiente" : v);
   sections.push({
     title: "Resumen de compra",
+    withImage: true,
     rows: [
       ...(isStaff
         ? ([
@@ -183,6 +153,9 @@ export async function GET(_request: Request, { params }: Params) {
     orderNumber: number,
     subtitle: `Generada el ${formatDate(new Date())}`,
     sections,
+    image: order.projectImageData
+      ? { data: order.projectImageData, type: order.projectImageType }
+      : null,
   });
 
   return new NextResponse(Buffer.from(pdf), {

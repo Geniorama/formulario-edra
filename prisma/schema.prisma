@@ -319,6 +319,12 @@ model Order {
   depositReceiptSize Int? // tamaño en bytes
   depositReceiptData Bytes? // contenido del archivo
 
+  // Imagen del proyecto (va en el PDF de la orden; JPG o PNG guardado en la BD)
+  projectImageName String? // nombre original del archivo
+  projectImageType String? // MIME type
+  projectImageSize Int? // tamaño en bytes
+  projectImageData Bytes? // contenido del archivo
+
   status OrderStatus @default(EN_TRAMITE)
 
   createdAt DateTime @default(now())

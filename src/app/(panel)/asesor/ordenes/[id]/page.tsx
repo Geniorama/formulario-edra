@@ -35,8 +35,8 @@ export default async function AsesorOrdenDetallePage({
   const { id } = await params;
   const order = await prisma.order.findUnique({
     where: { id },
-    // El archivo del comprobante se descarga aparte (no se trae en la página).
-    omit: { depositReceiptData: true },
+    // Los archivos adjuntos se descargan aparte (no se traen en la página).
+    omit: { depositReceiptData: true, projectImageData: true },
     include: {
       items: { orderBy: { position: "asc" } },
       user: { include: { clientProfile: true } },
@@ -164,6 +164,7 @@ export default async function AsesorOrdenDetallePage({
                   size: order.depositReceiptSize,
                 }
               : null,
+            projectImageName: order.projectImageName,
           }}
         />
       </div>
